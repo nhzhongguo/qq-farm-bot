@@ -39,6 +39,9 @@ const isQqAccount = computed(() => {
   return platform === 'qq'
 })
 
+const gidSearchKeyword = ref('')
+const showGidListModal = ref(false)
+
 const knownFriendGidCount = computed(() => knownFriendGids.value.length)
 const knownFriendGidSet = computed(() => new Set(knownFriendGids.value.map(Number)))
 const friendGidSet = computed(() => new Set(friends.value.map(f => Number(f.gid))))
@@ -104,8 +107,6 @@ const newKnownFriendGid = ref('')
 const localKnownFriendGidSyncCooldownSec = ref(300)
 const showBatchAddGidModal = ref(false)
 const batchGidInput = ref('')
-const showGidListModal = ref(false)
-const gidSearchKeyword = ref('')
 
 const interactFilter = ref('all')
 const interactFilters = [

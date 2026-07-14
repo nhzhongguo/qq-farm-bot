@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output and generated reports
+web/dist/
+web/stats.html
+core/dist/
+
+# Runtime data and logs
+core/data/
+*.log
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
