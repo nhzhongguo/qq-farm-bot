@@ -9,7 +9,6 @@ const {
     isAutomationOn,
     getFriendQuietHours,
     getFriendBlacklist,
-    setFriendBlacklist,
     getPlantBlacklist,
     getKnownFriendGids,
     getKnownFriendGidSyncCooldownSec,
@@ -480,6 +479,12 @@ async function getAllFriends(forceSync = false) {
     const body = types.GetAllFriendsRequest.encode(types.GetAllFriendsRequest.create({})).finish();
     const { body: replyBody } = await sendMsgAsync('gamepb.friendpb.FriendService', 'GetAll', body);
     return types.GetAllFriendsReply.decode(replyBody);
+}
+
+async function getApplications() {
+    const body = types.GetApplicationsRequest.encode(types.GetApplicationsRequest.create({})).finish();
+    const { body: replyBody } = await sendMsgAsync('gamepb.friendpb.FriendService', 'GetApplications', body);
+    return types.GetApplicationsReply.decode(replyBody);
 }
 
 async function acceptFriends(gids) {
@@ -1706,7 +1711,7 @@ async function checkFriends(options = {}) {
 
                     try {
                         await visitFriend(friend, totalActions, state.gid, state.accountId);
-                    } catch (e) {
+                    } catch {
                         // 单个好友失败不影响整体
                     }
                     await randomDelay(2000, 3500);
@@ -1849,8 +1854,10 @@ async function checkAndAcceptApplications() {
 
         const gids = applications.map(a => toNum(a.gid));
         await acceptFriendsWithRetry(gids);
-    } catch {
-        // 静默失败，可能是 QQ 平台不支持
+    } catch (e) {
+        if (CONFIG.platform !== 'qq') {
+            logWarn('申请', `检查好友申请失败: ${e.message}`);
+        }
     }
 }
 

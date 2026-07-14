@@ -100,6 +100,7 @@ onMounted(async () => {
   if (currentAccountId.value) {
     await settingStore.fetchSettings(currentAccountId.value)
     syncLocalStrategySettings()
+    syncLocalAutomationSettings()
     syncLocalOfflineSettings()
     await farmStore.fetchSeeds(currentAccountId.value)
   }
@@ -469,7 +470,7 @@ async function saveStrategySettings() {
     const fullSettings = {
       ...settings.value,
       ...localStrategySettings.value,
-      automation: localAutomationSettings.value.automation,
+      automation: undefined,
     }
     const res = await settingStore.saveSettings(currentAccountId.value, fullSettings)
     if (res.ok) {
@@ -770,8 +771,8 @@ async function handleChangePassword() {
     showAlert('两次密码输入不一致', 'danger')
     return
   }
-  if (passwordForm.value.new.length < 4) {
-    showAlert('密码长度至少4位', 'danger')
+  if (passwordForm.value.new.length < 6) {
+    showAlert('密码长度至少6位', 'danger')
     return
   }
 

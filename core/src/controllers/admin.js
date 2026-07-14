@@ -22,7 +22,6 @@ const { MiniProgramLoginSession } = require('../services/qrlogin');
 const { getSchedulerRegistrySnapshot } = require('../services/scheduler');
 const userStore = require('../models/user-store');
 
-const hashPassword = (pwd) => crypto.createHash('sha256').update(String(pwd || '')).digest('hex');
 const adminLogger = createModuleLogger('admin');
 
 let app = null;
@@ -68,23 +67,12 @@ function startAdminServer(dataProvider) {
     provider = dataProvider;
 
     app = express();
-    app.set('trust proxy', true);
+    const trustProxyEnv = String(process.env.TRUST_PROXY || '').trim().toLowerCase();
+    app.set('trust proxy', trustProxyEnv === '1' || trustProxyEnv === 'true' ? 1 : false);
     app.use(express.json());
 
     function getClientIp(req) {
-        const cfIp = req.headers['cf-connecting-ip'];
-        if (cfIp) return cfIp.trim();
-        
-        const xRealIp = req.headers['x-real-ip'];
-        if (xRealIp) return xRealIp.trim();
-        
-        const xForwardedFor = req.headers['x-forwarded-for'];
-        if (xForwardedFor) {
-            const ips = xForwardedFor.split(',').map(ip => ip.trim()).filter(Boolean);
-            if (ips.length > 0) return ips[0];
-        }
-        
-        if (req.ip && req.ip !== '::1' && req.ip !== '::ffff:127.0.0.1') {
+        if (req.ip) {
             return req.ip;
         }
         
@@ -149,7 +137,7 @@ function startAdminServer(dataProvider) {
         }
         
         res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS, PUT');
-        res.header('Access-Control-Allow-Headers', 'Content-Type, x-account-id, x-admin-token, x-proxy-api-key, x-proxy-api-url, x-proxy-app-id');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, x-account-id, x-admin-token');
         res.header('Access-Control-Allow-Credentials', 'true');
         res.header('Access-Control-Max-Age', '86400');
         
@@ -457,11 +445,19 @@ function startAdminServer(dataProvider) {
         }
 
         const result = userStore.changePassword(username, oldPassword, newPassword);
+        if (result.ok) {
+            for (const [token, user] of tokenUserMap.entries()) {
+                if (user.username === username) {
+                    user.mustChangePassword = false;
+                    tokenUserMap.set(token, user);
+                }
+            }
+        }
         res.json(result);
     });
 
     app.use('/api', (req, res, next) => {
-        if (req.path === '/login' || req.path === '/qr/create' || req.path === '/qr/check' || req.path === '/proxy' || req.path === '/card-claim/status' || req.path === '/card-claim/claim' || req.path === '/game-version') return next();
+        if (req.path === '/login' || req.path === '/card-claim/status' || req.path === '/card-claim/claim' || req.path === '/game-version') return next();
         return authRequired(req, res, next);
     });
 
@@ -859,7 +855,7 @@ function startAdminServer(dataProvider) {
             if (provider && typeof provider.getFriends === 'function') {
                 friendsList = await provider.getFriends(id) || [];
             }
-        } catch (e) {
+        } catch {
             // 忽略获取好友列表失败
         }
         
@@ -919,7 +915,7 @@ function startAdminServer(dataProvider) {
             if (provider && typeof provider.getFriends === 'function') {
                 friendsList = await provider.getFriends(id) || [];
             }
-        } catch (e) {
+        } catch {
             // 忽略获取好友列表失败
         }
         
@@ -1857,12 +1853,13 @@ function startAdminServer(dataProvider) {
     app.post('/api/card-claim/claim', (req, res) => {
         try {
             const ua = req.headers['user-agent'] || '';
+            const identity = `${getClientIp(req)}|${ua}`;
             const username = req.body?.username || null;
             
             // 清理过期记录
             userStore.clearExpiredClaimRecords();
             
-            const result = userStore.claimCardByUA(ua, username);
+            const result = userStore.claimCardByUA(identity, username);
             
             if (!result.ok) {
                 const response = { ok: false, error: result.error };
@@ -1904,16 +1901,6 @@ function startAdminServer(dataProvider) {
         }
     });
 
-    // 获取所有用户（带密码，仅管理员）
-    app.get('/api/admin/users-with-password', authRequired, adminRequired, (req, res) => {
-        try {
-            const users = userStore.getAllUsersWithPassword();
-            res.json({ ok: true, data: users });
-        } catch (e) {
-            res.status(500).json({ ok: false, error: e.message });
-        }
-    });
-
     // 更新用户
     app.post('/api/admin/users/:username', authRequired, adminRequired, (req, res) => {
         try {
@@ -1945,6 +1932,10 @@ function startAdminServer(dataProvider) {
             
             if (!result.ok) {
                 return res.status(400).json(result);
+            }
+
+            if (result.user.username !== username && store.renameUserOwnership) {
+                store.renameUserOwnership(username, result.user.username);
             }
 
             // 更新该用户所有会话中的信息
@@ -1979,6 +1970,13 @@ function startAdminServer(dataProvider) {
             if (!result.ok) {
                 return res.status(400).json(result);
             }
+            const accountData = provider.getAccounts();
+            const ownedAccounts = (accountData.accounts || []).filter(account => account.username === username);
+            for (const account of ownedAccounts) {
+                provider.stopAccount(account.id);
+            }
+            if (store.deleteAccountsByUser) store.deleteAccountsByUser(username);
+            if (store.deleteUserConfig) store.deleteUserConfig(username);
             // 强制下线该用户的所有会话
             for (const [token, user] of tokenUserMap.entries()) {
                 if (user.username === username) {
@@ -2076,7 +2074,15 @@ function startAdminServer(dataProvider) {
 
             // 普通用户获取全局配置，管理员可以获取并修改全局配置
             const globalConfig = store.getGlobalWxConfig();
-            res.json({ ok: true, config: globalConfig });
+            const { apiKey, ...publicConfig } = globalConfig;
+            res.json({
+                ok: true,
+                config: {
+                    ...publicConfig,
+                    apiKey: '',
+                    hasApiKey: !!String(apiKey || '').trim(),
+                },
+            });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }
@@ -2127,6 +2133,9 @@ function startAdminServer(dataProvider) {
             }
 
             const accountId = String(target.id);
+            if (!checkAccountAccess(req, accountId)) {
+                return res.status(403).json({ ok: false, error: '无权访问此账号' });
+            }
             const data = addOrUpdateAccount({ id: accountId, name: remark });
             if (provider && typeof provider.setRuntimeAccountName === 'function') {
                 provider.setRuntimeAccountName(accountId, remark);
@@ -2411,19 +2420,29 @@ function startAdminServer(dataProvider) {
     // 用于转发请求到第三方微信登录 API（如 api.aineishe.com）
     app.post('/api/proxy', async (req, res) => {
         const { action, ...params } = req.body || {};
+        const allowedActions = new Set(['getqr', 'checkqr', 'jslogin']);
 
-        if (!action) {
-            return res.status(400).json({ code: -1, msg: '缺少 action 参数' });
+        if (!allowedActions.has(action)) {
+            return res.status(400).json({ code: -1, msg: '不支持的 action 参数' });
         }
 
-        // 从请求头或配置中获取 API 配置
-        // 优先使用请求头中的配置（前端传入）
-        const apiUrl = req.headers['x-proxy-api-url'] || process.env.WX_PROXY_API_URL || 'http://127.0.0.1:8059/api';
-        const apiKey = req.headers['x-proxy-api-key'] || process.env.WX_PROXY_API_KEY || '';
-        const appId = req.headers['x-proxy-app-id'] || process.env.WX_PROXY_APP_ID || 'wx5306c5978fdb76e4';
+        const wxConfig = store.getGlobalWxConfig();
+        const apiUrl = process.env.WX_PROXY_API_URL || wxConfig.proxyApiUrl || wxConfig.apiBase;
+        const apiKey = process.env.WX_PROXY_API_KEY || wxConfig.apiKey || '';
+        const appId = process.env.WX_PROXY_APP_ID || wxConfig.appId || 'wx5306c5978fdb76e4';
 
         if (!apiKey) {
             return res.status(400).json({ code: -1, msg: '缺少 API Key' });
+        }
+
+        let proxyUrl;
+        try {
+            proxyUrl = new URL(apiUrl);
+        } catch {
+            return res.status(400).json({ code: -1, msg: '代理 API 地址无效' });
+        }
+        if (proxyUrl.protocol !== 'http:' && proxyUrl.protocol !== 'https:') {
+            return res.status(400).json({ code: -1, msg: '代理 API 仅支持 HTTP 或 HTTPS' });
         }
 
         // 如果是 jslogin 动作，自动添加 appid
@@ -2432,10 +2451,11 @@ function startAdminServer(dataProvider) {
         }
 
         try {
-            const url = `${apiUrl}?api_key=${encodeURIComponent(apiKey)}&action=${action}`;
-            adminLogger.info('proxy request', { action, apiUrl });
+            proxyUrl.searchParams.set('api_key', apiKey);
+            proxyUrl.searchParams.set('action', action);
+            adminLogger.info('proxy request', { action, apiUrl: proxyUrl.origin });
 
-            const response = await fetch(url, {
+            const response = await fetch(proxyUrl.toString(), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(params)

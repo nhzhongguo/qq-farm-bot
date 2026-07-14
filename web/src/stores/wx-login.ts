@@ -6,6 +6,7 @@ export interface WxLoginConfig {
   enabled: boolean
   apiBase: string
   apiKey: string
+  hasApiKey?: boolean
   proxyApiUrl: string
   appId: string
   autoAddAccount: boolean
@@ -91,10 +92,7 @@ export const useWxLoginStore = defineStore('wx-login', () => {
   }
 
   // 判断是否需要使用代理模式（api_key 不为空）
-  const useProxyMode = computed(() => !!config.value.apiKey)
-
-  // 获取代理API URL（确保有默认值）
-  const proxyApiUrl = computed(() => config.value.proxyApiUrl || defaultConfig.proxyApiUrl)
+  const useProxyMode = computed(() => config.value.hasApiKey === true || !!config.value.apiKey)
 
   // 获取二维码
   async function getQRCode(): Promise<boolean> {
@@ -112,8 +110,7 @@ export const useWxLoginStore = defineStore('wx-login', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-proxy-api-key': config.value.apiKey,
-            'x-proxy-api-url': proxyApiUrl.value,
+            'x-admin-token': userStore.token,
           },
           body: JSON.stringify({ action: 'getqr' }),
         })
@@ -182,8 +179,7 @@ export const useWxLoginStore = defineStore('wx-login', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-proxy-api-key': config.value.apiKey,
-            'x-proxy-api-url': proxyApiUrl.value,
+            'x-admin-token': userStore.token,
           },
           body: JSON.stringify({ action: 'checkqr', uuid: uuid.value }),
         })
@@ -274,8 +270,7 @@ export const useWxLoginStore = defineStore('wx-login', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-proxy-api-key': config.value.apiKey,
-            'x-proxy-api-url': proxyApiUrl.value,
+            'x-admin-token': userStore.token,
           },
           body: JSON.stringify({ action: 'jslogin', wxid: targetWxid }),
         })

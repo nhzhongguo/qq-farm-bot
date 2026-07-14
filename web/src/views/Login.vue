@@ -144,9 +144,10 @@ async function handleSubmit() {
       if (result.ok) {
         if (result.data?.mustChangePassword) {
           success.value = '登录成功！请修改默认密码以确保账户安全'
+          localStorage.setItem('settings-active-tab', 'user')
         }
         setTimeout(() => {
-          window.location.href = '/'
+          window.location.href = result.data?.mustChangePassword ? '/settings' : '/'
         }, 500)
       }
       else {

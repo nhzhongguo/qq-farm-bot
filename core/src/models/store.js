@@ -33,7 +33,7 @@ function readKnownFriendGidsCache(accountId) {
                 return data.gids;
             }
         }
-    } catch (e) {
+    } catch {
         // 忽略读取错误
     }
     return null;
@@ -46,7 +46,7 @@ function writeKnownFriendGidsCache(accountId, gids) {
             gids: gids || [],
             updatedAt: Date.now(),
         });
-    } catch (e) {
+    } catch {
         // 忽略写入错误
     }
 }
@@ -1153,6 +1153,33 @@ function deleteAccountsByUser(username) {
     return { deletedCount: deletedIds.length, deletedIds };
 }
 
+function renameUserOwnership(oldUsername, newUsername) {
+    const oldName = String(oldUsername || '').trim();
+    const newName = String(newUsername || '').trim();
+    if (!oldName || !newName || oldName === newName) return { updatedAccounts: 0 };
+
+    const data = loadAccounts();
+    let updatedAccounts = 0;
+    for (const account of data.accounts) {
+        if (account.username === oldName) {
+            account.username = newName;
+            account.updatedAt = Date.now();
+            updatedAccounts++;
+        }
+    }
+    if (updatedAccounts > 0) saveAccounts(data);
+
+    if (globalConfig.userOfflineReminders && globalConfig.userOfflineReminders[oldName]) {
+        if (!globalConfig.userOfflineReminders[newName]) {
+            globalConfig.userOfflineReminders[newName] = globalConfig.userOfflineReminders[oldName];
+        }
+        delete globalConfig.userOfflineReminders[oldName];
+        saveGlobalConfig();
+    }
+
+    return { updatedAccounts };
+}
+
 function deleteUserConfig(username) {
     // 删除用户特定的配置
     deleteUserOfflineReminder(username);
@@ -1289,6 +1316,7 @@ module.exports = {
     // 用户隔离支持
     getAccountsByUser,
     deleteAccountsByUser,
+    renameUserOwnership,
     deleteUserConfig,
     // 蔬菜黑名单
     getPlantBlacklist,

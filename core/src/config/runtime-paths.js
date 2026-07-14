@@ -17,6 +17,8 @@ function getAppRootForWritable() {
 }
 
 function getDataDir() {
+    const configuredDir = String(process.env.FARM_DATA_DIR || '').trim();
+    if (configuredDir) return path.resolve(configuredDir);
     return path.join(getAppRootForWritable(), 'data');
 }
 

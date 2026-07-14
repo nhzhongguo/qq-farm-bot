@@ -5,6 +5,7 @@
     "dev:core": "pnpm -C core dev",
     "dev:web": "pnpm -C web dev",
     "dev": "pnpm build:web && pnpm dev:core",
+    "test": "pnpm -C core test",
     "lint": "pnpm lint:core && pnpm lint:web",
     "lint:core": "pnpm -C core lint",
     "lint:web": "pnpm -C web lint",
@@ -15,10 +16,5 @@
     "package:mac": "pnpm build:web && pnpm -C core build:mac",
     "package:release": "pnpm build:web && pnpm -C core build:release",
     "install:all": "pnpm install -r"
-  },
-  "pnpm": {
-    "overrides": {
-      "@babel/traverse": "7.26.10"
-    }
   }
 }

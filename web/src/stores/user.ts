@@ -55,6 +55,7 @@ export const useUserStore = defineStore('user', () => {
   const userCard = computed(() => userInfo.value?.card)
   const accountLimit = computed(() => userInfo.value?.accountLimit ?? 2)
   const avatar = computed(() => userInfo.value?.avatar || '')
+  const mustChangePassword = computed(() => userInfo.value?.mustChangePassword === true)
 
   // 检查用户是否过期
   const isExpired = computed(() => {
@@ -149,6 +150,9 @@ export const useUserStore = defineStore('user', () => {
 
   async function changePassword(oldPassword: string, newPassword: string) {
     const res = await api.post('/api/user/change-password', { oldPassword, newPassword })
+    if (res.data.ok && userInfo.value) {
+      userInfo.value.mustChangePassword = false
+    }
     return res.data
   }
 
@@ -217,6 +221,7 @@ export const useUserStore = defineStore('user', () => {
     userCard,
     accountLimit,
     avatar,
+    mustChangePassword,
     isExpired,
     expireTimeText,
     login,

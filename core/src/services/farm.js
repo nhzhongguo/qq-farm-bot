@@ -12,8 +12,8 @@ const { toLong, toNum, getServerTimeSec, toTimeSec, log, logWarn, sleep, randomD
 const { getPlantRankings } = require('./analytics');
 const { createScheduler } = require('./scheduler');
 const { recordOperation } = require('./stats');
-const { getBagSeeds, getBag, getBagItems, getContainerHoursFromBagItems } = require('./warehouse');
-const { autoBuyFertilizer, checkAndBuyFertilizerBoth } = require('./mall');
+const { getBagSeeds } = require('./warehouse');
+const { checkAndBuyFertilizerBoth } = require('./mall');
 
 // ============ 内部状态 ============
 let isCheckingFarm = false;
@@ -21,7 +21,6 @@ let isFirstFarmCheck = true;
 let farmLoopRunning = false;
 let externalSchedulerMode = false;
 let fertilizerBuyCheckTimer = null;
-let lastFertilizerBuyCheckAt = 0;
 const farmScheduler = createScheduler('farm');
 
 // ============ 农场 API ============
@@ -265,12 +264,6 @@ function buildSlaveToMasterMap(lands) {
         }
     }
     return map;
-}
-
-function isOccupiedSlaveLandWithMap(land, landsMap, slaveToMasterMap) {
-    const landId = toNum(land && land.id);
-    if (!landId) return false;
-    return slaveToMasterMap.has(landId);
 }
 
 function summarizeLandDetails(lands) {

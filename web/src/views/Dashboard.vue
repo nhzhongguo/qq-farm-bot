@@ -286,6 +286,7 @@ const OP_META: Record<string, { label: string, icon: string, color: string }> = 
   taskClaim: { label: '任务', icon: 'i-carbon-task-complete', color: 'text-indigo-500' },
   sell: { label: '出售', icon: 'i-carbon-shopping-cart', color: 'text-pink-500' },
 }
+const DEFAULT_OP_ICON = 'i-carbon-information'
 
 const filteredOperations = computed(() => {
   const ops = status.value?.operations || {}
@@ -303,7 +304,7 @@ function getOpName(key: string | number) {
 }
 
 function getOpIcon(key: string | number) {
-  return OP_META[String(key)]?.icon || 'i-carbon-circle-dash'
+  return OP_META[String(key)]?.icon || DEFAULT_OP_ICON
 }
 
 function getOpColor(key: string | number) {
@@ -524,7 +525,7 @@ useIntervalFn(updateCountdowns, 1000)
           </div>
           <div class="text-right">
             <div class="flex items-center justify-end gap-1.5 text-xs text-gray-500">
-              <div class="i-carbon-circle text-amber-500" />
+              <div class="i-carbon-information text-amber-500" />
               金豆豆
             </div>
             <div class="text-2xl text-amber-500 font-bold dark:text-amber-400">

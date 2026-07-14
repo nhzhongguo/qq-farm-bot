@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { getDataFile, ensureDataDir } = require('../config/runtime-paths');
+const { writeJsonFileAtomic, writeTextFileAtomic } = require('../services/json-db');
 const crypto = require('crypto');
 
 const USERS_FILE = getDataFile('users.json');
@@ -22,18 +23,66 @@ const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000;
 const RATE_LIMIT_WINDOW = 60 * 1000;
 const MAX_ATTEMPTS_PER_IP = 10;
+const CARD_CLAIM_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function readJsonWithBackup(filePath, fallback) {
+    ensureDataDir();
+    const backupPath = `${filePath}.bak`;
+
+    if (fs.existsSync(filePath)) {
+        try {
+            const mainRaw = fs.readFileSync(filePath, 'utf8');
+            const data = JSON.parse(mainRaw);
+            if (!fs.existsSync(backupPath)) {
+                writeTextFileAtomic(backupPath, mainRaw);
+            }
+            return data;
+        } catch (mainError) {
+            if (!fs.existsSync(backupPath)) {
+                throw new Error(`数据文件损坏且没有可用备份: ${filePath} (${mainError.message})`);
+            }
+            try {
+                const backupRaw = fs.readFileSync(backupPath, 'utf8');
+                const recovered = JSON.parse(backupRaw);
+                writeTextFileAtomic(filePath, backupRaw);
+                console.warn(`[数据恢复] 已从备份恢复: ${filePath}`);
+                return recovered;
+            } catch (backupError) {
+                throw new Error(`数据文件及备份均损坏: ${filePath} (${backupError.message})`);
+            }
+        }
+    }
+
+    if (fs.existsSync(backupPath)) {
+        const backupRaw = fs.readFileSync(backupPath, 'utf8');
+        const recovered = JSON.parse(backupRaw);
+        writeTextFileAtomic(filePath, backupRaw);
+        console.warn(`[数据恢复] 主文件缺失，已从备份恢复: ${filePath}`);
+        return recovered;
+    }
+
+    return fallback;
+}
+
+function writeJsonWithBackup(filePath, data) {
+    ensureDataDir();
+    if (fs.existsSync(filePath)) {
+        const currentRaw = fs.readFileSync(filePath, 'utf8');
+        JSON.parse(currentRaw);
+        writeTextFileAtomic(`${filePath}.bak`, currentRaw);
+    }
+    writeJsonFileAtomic(filePath, data);
+    writeJsonFileAtomic(`${filePath}.bak`, data);
+}
 
 let loginAttempts = {};
 let loginLogs = [];
 
 function loadLoginLogs() {
     try {
-        ensureDataDir();
-        if (fs.existsSync(LOGIN_LOGS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(LOGIN_LOGS_FILE, 'utf8'));
-            loginLogs = Array.isArray(data.logs) ? data.logs : [];
-        }
-    } catch (e) {
+        const data = readJsonWithBackup(LOGIN_LOGS_FILE, { logs: [] });
+        loginLogs = Array.isArray(data.logs) ? data.logs : [];
+    } catch {
         loginLogs = [];
     }
 }
@@ -43,7 +92,7 @@ function saveLoginLogs() {
         ensureDataDir();
         const maxLogs = 1000;
         const logsToSave = loginLogs.slice(-maxLogs);
-        fs.writeFileSync(LOGIN_LOGS_FILE, JSON.stringify({ logs: logsToSave }, null, 2), 'utf8');
+        writeJsonWithBackup(LOGIN_LOGS_FILE, { logs: logsToSave });
     } catch (e) {
         console.error('保存登录日志失败:', e.message);
     }
@@ -81,12 +130,9 @@ function clearLoginLogs() {
 
 function loadLoginAttempts() {
     try {
-        ensureDataDir();
-        if (fs.existsSync(LOGIN_ATTEMPTS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(LOGIN_ATTEMPTS_FILE, 'utf8'));
-            loginAttempts = data || {};
-        }
-    } catch (e) {
+        const data = readJsonWithBackup(LOGIN_ATTEMPTS_FILE, {});
+        loginAttempts = data || {};
+    } catch {
         loginAttempts = {};
     }
 }
@@ -94,7 +140,7 @@ function loadLoginAttempts() {
 function saveLoginAttempts() {
     try {
         ensureDataDir();
-        fs.writeFileSync(LOGIN_ATTEMPTS_FILE, JSON.stringify(loginAttempts, null, 2), 'utf8');
+        writeJsonWithBackup(LOGIN_ATTEMPTS_FILE, loginAttempts);
     } catch (e) {
         console.error('保存登录尝试记录失败:', e.message);
     }
@@ -279,52 +325,36 @@ let users = [];
 let cards = [];
 
 function loadUsers() {
-    ensureDataDir();
-    try {
-        if (fs.existsSync(USERS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-            users = Array.isArray(data.users) ? data.users : [];
-        } else {
-            users = [];
-            saveUsers();
-        }
-    } catch (e) {
-        console.error('加载用户数据失败:', e.message);
-        users = [];
+    const data = readJsonWithBackup(USERS_FILE, { users: [] });
+    if (!data || !Array.isArray(data.users)) {
+        throw new Error(`用户数据格式无效: ${USERS_FILE}`);
     }
+    users = data.users;
 }
 
 function saveUsers() {
-    ensureDataDir();
     try {
-        fs.writeFileSync(USERS_FILE, JSON.stringify({ users }, null, 2), 'utf8');
+        writeJsonWithBackup(USERS_FILE, { users });
     } catch (e) {
         console.error('保存用户数据失败:', e.message);
+        throw e;
     }
 }
 
 function loadCards() {
-    ensureDataDir();
-    try {
-        if (fs.existsSync(CARDS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(CARDS_FILE, 'utf8'));
-            cards = Array.isArray(data.cards) ? data.cards : [];
-        } else {
-            cards = [];
-            saveCards();
-        }
-    } catch (e) {
-        console.error('加载卡密数据失败:', e.message);
-        cards = [];
+    const data = readJsonWithBackup(CARDS_FILE, { cards: [] });
+    if (!data || !Array.isArray(data.cards)) {
+        throw new Error(`卡密数据格式无效: ${CARDS_FILE}`);
     }
+    cards = data.cards;
 }
 
 function saveCards() {
-    ensureDataDir();
     try {
-        fs.writeFileSync(CARDS_FILE, JSON.stringify({ cards }, null, 2), 'utf8');
+        writeJsonWithBackup(CARDS_FILE, { cards });
     } catch (e) {
         console.error('保存卡密数据失败:', e.message);
+        throw e;
     }
 }
 
@@ -337,10 +367,15 @@ function initDefaultAdmin() {
             username: 'admin',
             password: hashPassword(defaultPassword),
             role: 'admin',
+            mustChangePassword: true,
             createdAt: Date.now()
         });
         saveUsers();
         console.log('[用户系统] 已创建默认管理员账号，默认密码: admin');
+    } else if (verifyPassword('admin', adminExists.password) && adminExists.mustChangePassword !== true) {
+        adminExists.mustChangePassword = true;
+        saveUsers();
+        console.warn('[用户系统] 检测到默认管理员密码，登录后必须修改密码');
     }
 }
 
@@ -399,7 +434,8 @@ function validateUser(username, password, ip = 'unknown') {
         role: user.role,
         cardCode: user.cardCode || null,
         card: user.card || null,
-        accountLimit: user.accountLimit || DEFAULT_ACCOUNT_LIMIT
+        accountLimit: user.accountLimit || DEFAULT_ACCOUNT_LIMIT,
+        mustChangePassword: user.mustChangePassword === true
     };
 }
 
@@ -463,6 +499,8 @@ function registerUser(username, password, cardCode) {
     users.push(newUser);
     card.usedBy = username;
     card.usedAt = now;
+    delete card.claimedAt;
+    delete card.claimIdentityHash;
 
     saveUsers();
     saveCards();
@@ -543,6 +581,8 @@ function renewUser(username, cardCode) {
     // 标记卡密已使用
     card.usedBy = username;
     card.usedAt = now;
+    delete card.claimedAt;
+    delete card.claimIdentityHash;
 
     saveUsers();
     saveCards();
@@ -791,92 +831,29 @@ function changePassword(username, oldPassword, newPassword) {
     return { ok: true, message: '密码修改成功' };
 }
 
-// 保存用户微信登录配置
-function saveWxLoginConfig(username, config) {
-    loadUsers();
-    const user = users.find(u => u.username === username);
-    if (!user) {
-        return { ok: false, error: '用户不存在' };
-    }
-
-    user.wxLoginConfig = {
-        ...config,
-        updatedAt: Date.now()
-    };
-
-    saveUsers();
-    return { ok: true, config: user.wxLoginConfig };
-}
-
-// 获取用户微信登录配置
-function getWxLoginConfig(username) {
-    loadUsers();
-    const user = users.find(u => u.username === username);
-    if (!user) {
-        return { ok: false, error: '用户不存在' };
-    }
-
-    return { ok: true, config: user.wxLoginConfig || null };
-}
-
-// 获取用户账号额度
-function getUserAccountLimit(username) {
-    loadUsers();
-    const user = users.find(u => u.username === username);
-    if (!user) {
-        return DEFAULT_ACCOUNT_LIMIT;
-    }
-    return user.accountLimit || DEFAULT_ACCOUNT_LIMIT;
-}
-
-// 检查用户是否可以添加更多账号
-function canAddAccount(username) {
-    loadUsers();
-    const user = users.find(u => u.username === username);
-    if (!user) {
-        return { canAdd: false, current: 0, limit: DEFAULT_ACCOUNT_LIMIT };
-    }
-    
-    // 管理员无限制
-    if (user.role === 'admin') {
-        return { canAdd: true, current: 0, limit: -1 };
-    }
-    
-    const limit = user.accountLimit || DEFAULT_ACCOUNT_LIMIT;
-    // 需要从 store 获取当前账号数量，这里先返回额度信息
-    return { canAdd: true, current: 0, limit };
-}
-
 initDefaultAdmin();
 
 // ============ 卡密领取功能 ============
 function loadCardClaimRecords() {
-    ensureDataDir();
     try {
-        if (fs.existsSync(CARD_CLAIM_FILE)) {
-            const data = JSON.parse(fs.readFileSync(CARD_CLAIM_FILE, 'utf8'));
-            cardClaimEnabled = data.enabled === true;
-            cardClaimRecords = data.records || [];
-        } else {
-            cardClaimEnabled = true;
-            cardClaimRecords = [];
-            saveCardClaimRecords();
-        }
+        const data = readJsonWithBackup(CARD_CLAIM_FILE, { enabled: true, records: [] });
+        cardClaimEnabled = data.enabled === true;
+        cardClaimRecords = Array.isArray(data.records) ? data.records : [];
     } catch (e) {
-        cardClaimEnabled = true;
-        cardClaimRecords = [];
+        console.error('加载卡密领取记录失败:', e.message);
+        throw e;
     }
 }
 
 function saveCardClaimRecords() {
-    ensureDataDir();
     try {
-        fs.writeFileSync(CARD_CLAIM_FILE, JSON.stringify({
+        writeJsonWithBackup(CARD_CLAIM_FILE, {
             enabled: cardClaimEnabled,
             records: cardClaimRecords
-        }, null, 2), 'utf8');
+        });
     } catch (e) {
-        // console.error('保存卡密领取记录失败:', e.message);
+        console.error('保存卡密领取记录失败:', e.message);
+        throw e;
     }
 }
 
@@ -892,16 +869,16 @@ function setCardClaimStatus(enabled) {
     return { enabled: cardClaimEnabled };
 }
 
-function checkUAClaimLimit(ua) {
+function checkUAClaimLimit(identity) {
     loadCardClaimRecords();
     const now = Date.now();
-    const uaHash = crypto.createHash('sha256').update(ua).digest('hex');
+    const identityHash = crypto.createHash('sha256').update(identity).digest('hex');
     
-    const record = cardClaimRecords.find(r => r.uaHash === uaHash);
+    const record = cardClaimRecords.find(r => r.identityHash === identityHash || r.uaHash === identityHash);
     if (record) {
         const elapsed = now - record.claimTime;
-        if (elapsed < 24 * 60 * 60 * 1000) {
-            const remainingMs = 24 * 60 * 60 * 1000 - elapsed;
+        if (elapsed < CARD_CLAIM_WINDOW_MS) {
+            const remainingMs = CARD_CLAIM_WINDOW_MS - elapsed;
             return {
                 allowed: false,
                 remainingMs,
@@ -913,15 +890,28 @@ function checkUAClaimLimit(ua) {
     return { allowed: true };
 }
 
-function claimCardByUA(ua, username = null) {
+function releaseExpiredCardReservations(now = Date.now()) {
+    let changed = false;
+    for (const card of cards) {
+        if (!card.usedBy && card.claimedAt && now - card.claimedAt >= CARD_CLAIM_WINDOW_MS) {
+            delete card.claimedAt;
+            delete card.claimIdentityHash;
+            changed = true;
+        }
+    }
+    if (changed) saveCards();
+}
+
+function claimCardByUA(identity, username = null) {
     loadCards();
     loadCardClaimRecords();
+    releaseExpiredCardReservations();
     
     if (!cardClaimEnabled) {
         return { ok: false, error: '卡密领取功能未开启' };
     }
     
-    const uaCheck = checkUAClaimLimit(ua);
+    const uaCheck = checkUAClaimLimit(identity);
     if (!uaCheck.allowed) {
         return { ok: false, error: uaCheck.message, remainingMs: uaCheck.remainingMs };
     }
@@ -929,6 +919,7 @@ function claimCardByUA(ua, username = null) {
     const unusedTimeCards = cards.filter(c => 
         c.type === 'time' && 
         !c.usedBy && 
+        !c.claimedAt &&
         c.enabled
     );
     
@@ -939,9 +930,12 @@ function claimCardByUA(ua, username = null) {
     const randomIndex = Math.floor(Math.random() * unusedTimeCards.length);
     const selectedCard = unusedTimeCards[randomIndex];
     
-    const uaHash = crypto.createHash('sha256').update(ua).digest('hex');
+    const identityHash = crypto.createHash('sha256').update(identity).digest('hex');
+    selectedCard.claimedAt = Date.now();
+    selectedCard.claimIdentityHash = identityHash;
+    saveCards();
     cardClaimRecords.push({
-        uaHash,
+        identityHash,
         claimTime: Date.now(),
         cardCode: selectedCard.code,
         username: username || null
@@ -964,12 +958,13 @@ function getCardClaimRecords() {
 
 function clearExpiredClaimRecords() {
     loadCardClaimRecords();
+    loadCards();
     const now = Date.now();
-    const oneDayMs = 24 * 60 * 60 * 1000;
+    releaseExpiredCardReservations(now);
     
     const beforeCount = cardClaimRecords.length;
     cardClaimRecords = cardClaimRecords.filter(r => 
-        now - r.claimTime < oneDayMs
+        now - r.claimTime < CARD_CLAIM_WINDOW_MS
     );
     
     if (cardClaimRecords.length !== beforeCount) {
