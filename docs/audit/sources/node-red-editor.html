@@ -1,0 +1,287 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Editor Guide : Node-RED</title>
+	<link href='https://fonts.googleapis.com/css?family=Roboto+Slab:400,700,300,100' rel='stylesheet' type='text/css'>
+	<link href='https://fonts.googleapis.com/css?family=Ubuntu+Mono' rel='stylesheet' type='text/css'>
+	<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,700" rel="stylesheet">
+
+	<link href="/css/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+	<script src="/jquery/js/jquery-1.9.1.js"></script>
+	<link href="/css/simplegrid.css?d=20200825" rel="stylesheet" media="screen">
+	<link href="/css/style.css?d=20200825" rel="stylesheet" media="screen">
+	<link href="/css/front.css?d=20200825" rel="stylesheet" media="screen">
+	<link href="/css/docs.css?d=20200825" rel="stylesheet" media="screen">
+	<link href="/css/blog.css?d=20200825" rel="stylesheet" media="screen">
+	<link href="/css/syntax.css?d=20211008" rel="stylesheet" media="screen">
+	<link type="application/atom+xml" rel="alternate" href="https://nodered.org/feed.xml" />
+
+</head>
+<body>
+<div class="banner">
+	<a href="https://nrcon.nodered.org/" class="banner-content">
+		📢 <strong>Call for Papers is open!</strong> Speak at Node-RED Con 2026 · Nov 3 · Submit by July 31 &raquo;
+	</a>
+</div>
+<div class="header">
+    <div class="header-content">
+        <div class="brand"><a href="/">Node-RED</a></div>
+        <ul class="navigation">
+            <li ><a href="/">home</a></li>
+            <li ><a href="/about/">about</a></li>
+            <li ><a href="/blog/">blog</a></li>
+            <li class="current"><a href="/docs/">documentation</a></li>
+            <li><a href="https://discourse.nodered.org/">forum</a></li>
+            <li><a href="https://flows.nodered.org/">flows</a></li>
+            <li><a href="https://github.com/node-red">github</a></li>
+        </ul>
+        <a href="#" class="menu"><i class="fa fa-reorder fa-2x"></i></a>
+    </div>
+</div>
+
+<div class="docs">
+    <div class="breadcrumbs">
+    <div class="grid">
+
+        <a href="/docs">docs</a>
+
+         &bull; <a href="/docs/user-guide">user guide</a>
+        &bull; <a class="active" href="">editor</a>
+
+    </div>
+</div>
+
+    <div class="grid" style="padding-bottom: 50px">
+
+        <div id="toc-column" class="col-3-12">
+            <ul class="toc">
+    <li class="toc-expander"><i class="fa fa-caret-down"></i></li>
+    <li class="tocheader">
+        <ul>
+            <li class="toctitle active"><a href="/docs/user-guide/editor">Editor Guide</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace">Workspace</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/actions" style="padding-left: 50px;">Actions</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/keyboard" style="padding-left: 50px;">Keyboard</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/flows" style="padding-left: 50px;">Flows</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/nodes" style="padding-left: 50px;">Nodes</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/wires" style="padding-left: 50px;">Wires</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/groups" style="padding-left: 50px;">Groups</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/subflows" style="padding-left: 50px;">Subflows</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/selection" style="padding-left: 50px;">Selection</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/arrange" style="padding-left: 50px;">Arranging Nodes</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/import-export" style="padding-left: 50px;">Import/Export</a></li>
+            <li ><a href="/docs/user-guide/editor/workspace/search" style="padding-left: 50px;">Search</a></li>
+            <li ><a href="/docs/user-guide/editor/palette/">Palette</a></li>
+            <li ><a href="/docs/user-guide/editor/palette/manager" style="padding-left: 50px;">Palette Manager</a></li>
+            <li ><a href="/docs/user-guide/editor/sidebar">Sidebar</a></li>
+            <li ><a href="/docs/user-guide/editor/sidebar/explorer" style="padding-left: 50px;">Explorer</a></li>
+            <li ><a href="/docs/user-guide/editor/sidebar/info" style="padding-left: 50px;">Information</a></li>
+            <li ><a href="/docs/user-guide/editor/sidebar/help" style="padding-left: 50px;">Help</a></li>
+            <li ><a href="/docs/user-guide/editor/sidebar/debug" style="padding-left: 50px;">Debug</a></li>
+            <li ><a href="/docs/user-guide/editor/sidebar/config" style="padding-left: 50px;">Config nodes</a></li>
+            <li ><a href="/docs/user-guide/editor/sidebar/context" style="padding-left: 50px;">Context data</a></li>
+            <!-- <li ><a href="/docs/user-guide/editor/settings">Settings</a></li> -->
+            <!-- <li ><a href="/docs/user-guide/editor/settings/view" style="padding-left: 50px;">View</a></li> -->
+            <!-- <li ><a href="/docs/user-guide/editor/settings/keyboard" style="padding-left: 50px;">Keyboard</a></li> -->
+            <!-- <li ><a href="/docs/user-guide/editor/editors">Type Editors</a></li> -->
+            <!-- <li ><a href="/docs/user-guide/editor/editors/buffer" style="padding-left: 50px;">Buffer</a></li> -->
+            <!-- <li ><a href="/docs/user-guide/editor/editors/js" style="padding-left: 50px;">JavaScript</a></li> -->
+            <!-- <li ><a href="/docs/user-guide/editor/editors/json" style="padding-left: 50px;">JSON</a></li> -->
+            <!-- <li ><a href="/docs/user-guide/editor/editors/jsonata" style="padding-left: 50px;">JSONata expression</a></li> -->
+        </ul>
+    </li>
+</ul>
+<script>
+    $(function() {
+        var pageToc = $("<ul></ul>").appendTo(".toc li.active:not(.toctitle)");
+        $(".docs-content h3,.docs-content h4").each(function() {
+            $('<li id="toc-item-'+$(this).attr('id')+'"><a style="font-size: 0.9em; padding-left: 60px;" href="#'+$(this).attr('id')+'">'+$(this).text()+'</a></li>').appendTo(pageToc)
+        })
+    })
+</script>
+
+            &nbsp;
+<script>
+$(function() {
+    var TOC = $("ul.toc");
+
+    $(".toc-expander").click(function() {
+        if (TOC.hasClass('open')) {
+            TOC.removeClass('open');
+        } else {
+            TOC.addClass('open');
+        }
+    })
+
+    var fixed = false;
+    $(window).on("scroll", function(e) {
+        if ($(window).scrollTop() > 140) {
+            if (!fixed) {
+                TOC.addClass("fixed-toc");
+                TOC.width(TOC.parent().width());
+                fixed = true;
+            }
+        } else {
+            if (fixed) {
+                TOC.removeClass("fixed-toc");
+                TOC.width(TOC.parent().width());
+                fixed = false;
+            }
+        }
+
+    });
+
+    var positions = [];
+    var windowHeight;
+    var currentItem;
+
+
+    function resizeWindow() {
+        TOC.width(TOC.parent().width());
+        calculatePositions();
+        windowHeight = $(window).height();
+    }
+    function calculatePositions() {
+        positions = [];
+        $(".docs-content > div >  h3,.docs-content > div >  h4").each(function() {
+            positions.push({
+                el: $("#toc-item-"+$(this).attr('id')),
+                orig: $(this),
+                pos: $(this).offset().top +parseInt($(this).css("marginTop"))
+            });
+        });
+    }
+
+    function getCurrentItem() {
+        if (positions.length === 0) {
+            return;
+        }
+        var top = $(window).scrollTop();
+        var previous = positions[0].el;
+        for (var i=0;i<positions.length;i++) {
+            if (positions[i].pos > top) {
+                if (positions[i].pos-top < windowHeight/2 ) {
+                    return positions[i].el;
+                } else {
+                    return previous;
+                }
+            }
+            previous = positions[i].el;
+        }
+    }
+    function scrollWindow() {
+        var targetItem = getCurrentItem();
+        if (targetItem !== currentItem) {
+            if (currentItem) {
+                currentItem.removeClass("active");
+            }
+            currentItem = targetItem;
+            if (currentItem) {
+                currentItem.addClass("active");
+            }
+        }
+    }
+    $(window).resize(resizeWindow);
+    $(window).on("scroll",scrollWindow);
+    setTimeout(function() {
+        resizeWindow();
+        scrollWindow();
+    },500);
+
+});
+</script>
+
+        </div>
+        <div class="col-9-12">
+
+            <div class="docs-content">
+
+                <h1 class="docs-title">Editor Guide</h1>
+                <div><div style="text-align: center;">
+  <div style="width: 400px; display: inline-block;" class="figure">
+    <img src="images/editor-default.png" alt="Editor window" />
+    <p class="caption">Editor window</p>
+  </div>
+</div>
+
+<p>Welcome to the Node-RED editor - the place where you’ll build, wire together, and run your flows. If you’re just getting started, this guide will help you find your way around.</p>
+
+<p>Everything happens inside the editor window, which is organised into three main areas:</p>
+
+<ul>
+  <li>The header, running along the top, holds the deploy button and main menu - and the user menu too, if authentication is enabled.</li>
+  <li>The <a href="workspace">workspace</a> in the middle is where the work happens: this is where you build your flows.</li>
+  <li>The <a href="sidebar">sidebars</a> sit on either side of the workspace. They hold a set of panels - tools and information to support you as you work - and you can move any panel between the left and right sides to arrange the editor the way that suits you best.</li>
+</ul>
+
+<p>One panel worth knowing from the start is the <a href="palette">palette</a>, which lists all the nodes you have available to drag onto your canvas. It’s where most flows begin. By default it lives in the left sidebar, but like any panel you can move it to wherever feels right.</p>
+
+<p>Follow the links above to dig into any of these in more detail. There’s no need to read everything at once - feel free to explore the editor as you go.</p>
+
+<h3 id="node-red-essentials-on-youtube">Node-RED Essentials on YouTube</h3>
+
+<p>We also have a series of videos to help get you started. They haven’t been updated for Node-RED 5 yet, but they still cover everything you need for working with Node-RED.</p>
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/videoseries?list=PLyNBB9VCLmo1hyO-4fIZ08gqFcXBkHy-6" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen=""></iframe>
+</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+<div class="links">
+    <div class="grid">
+        <div class="col-1-4">
+            <p><a href="https://nodered.org">Node-RED</a>: Low-code programming for event-driven applications.</p>
+        </div>
+        <div class="col-1-4">
+            <ul>
+                <li><a href="https://github.com/node-red">GitHub</a></li>
+                <li><a href="https://www.npmjs.com/package/node-red">npm</a></li>
+                <li><a href="/docs">Documentation</a></li>
+                <li><a href="/docs/api">APIs</a></li>
+            </ul>
+        </div>
+        <div class="col-1-4">
+            <ul>
+                <li><a href="https://flows.nodered.org">Flow Library</a></li>
+                <li><a href="/about/">About</a></li>
+                <li><a href="/about/conduct">Code of Conduct</a></li>
+                <li><a href="/about/community">Community</a></li>
+            </ul>
+        </div>
+        <div class="col-1-4">
+            <ul>
+                <li><a href="/blog">Blog</a></li>
+                <li><a href="https://discourse.nodered.org">Forum</a></li>
+                <li><a href="/slack">Slack</a></li>
+                <li><a rel="me" href="https://social.nodered.org/@nodered">Mastodon</a></li>
+                <li><a href="https://twitter.com/nodered">Twitter</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="grid openjs">
+        <div class="col-1-4">
+            <a href="https://openjsf.org"><img class="openjs-logo" src="https://nodered.org/images/openjs_foundation-logo.svg" /></a>
+        </div>
+        <div class="col-3-4">
+            <p>Copyright <a href="https://openjsf.org">OpenJS Foundation</a> and Node-RED contributors. All rights reserved. The <a href="https://openjsf.org">OpenJS Foundation</a> has registered trademarks and uses trademarks.  For a list of trademarks of the <a href="https://openjsf.org">OpenJS Foundation</a>, please see our <a href="https://trademark-policy.openjsf.org">Trademark Policy</a> and <a href="https://trademark-list.openjsf.org">Trademark List</a>.  Trademarks and logos not indicated on the <a href="https://trademark-list.openjsf.org">list of OpenJS Foundation trademarks</a> are trademarks&trade; or registered&reg; trademarks of their respective holders. Use of them does not imply any affiliation with or endorsement by them.</p>
+            <p><a href="https://openjsf.org">The OpenJS Foundation</a> | <a href="https://terms-of-use.openjsf.org">Terms of Use</a> | <a href="https://privacy-policy.openjsf.org">Privacy Policy</a> | <a href="https://bylaws.openjsf.org">OpenJS Foundation Bylaws</a> | <a href="https://trademark-policy.openjsf.org">Trademark Policy</a> | <a href="https://trademark-list.openjsf.org">Trademark List</a> | <a href="https://www.linuxfoundation.org/cookies">Cookie Policy</a></p>
+        </div>
+    </div>
+</div>
+<script>
+ $(function() {
+    $(".menu").on("click", function(e) {
+        var s = $(".navigation").slideToggle('hide');
+        e.preventDefault();
+    });
+  });
+</script>
+<script defer data-domain="nodered.org" src="https://plausible.io/js/plausible.js"></script>
+</body>
+</html>

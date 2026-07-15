@@ -1,0 +1,39 @@
+# Active Task
+
+- Updated: 2026-07-15 11:02:28 +08:00
+- Status: complete
+- Mode: scoped-build
+- Project: QQ农场
+- Memory landing policy: ask-by-default
+- User goal: Friends+Settings 深度重设计；前端认证路径 e2e 冒烟；UI 重构批次 git commit
+- Touched modules: web design system, Friends, Settings, e2e, package scripts
+- Policy scope: friends-settings-e2e-ui-commit
+- ExecutionPolicy: lite-anchor
+- ExecutionPolicy source: none
+- Execution protocol skills: none
+- Lite Demo role: memory-anchor
+- Scope: 页面视觉/交互升级 + 轻量 e2e + 本地 commit；不改 worker/core data
+- Last approved route: Friends/Settings → e2e → git commit
+- Interruption risk: low
+- Allowed changes: Friends/Settings 模板与样式；e2e 配置与脚本；web 相关 UI 文件提交
+- Stable behavior: 好友/黑名单/访客业务逻辑；设置双保存路径；鉴权与限流
+- 稳定模块保护判断: 不触碰 core/data 与 worker 主循环
+- Memory hygiene: task-local
+- Artifact discipline: web build 通过后再 commit
+- Encoding check: UTF-8 no BOM
+- Pressure signals:
+- Rejected approaches: 业务逻辑大重写；全量 Playwright 真农场 e2e
+- Current step: None; task complete
+- Completed:
+  - Friends 深度重设计
+  - Settings 深度重设计
+  - Playwright auth smoke 5/5
+  - web build 通过；core tests 13/13
+  - git commit 1020f49 feat(ui): redesign panel design system and key pages
+- Next exact step: None; task complete
+- Validation gates: pnpm -C web build；pnpm test；pnpm -C web test:e2e
+- Regression guards: 好友批量操作/确认框/设置保存/切号
+- Rollback/backups: git 可回退到 1020f49
+- Do not touch: core/data；worker 主循环
+- Resume instruction: Archived only; create a new active-task for future work.
+- Route check: commit landed, docs/codex remains untracked

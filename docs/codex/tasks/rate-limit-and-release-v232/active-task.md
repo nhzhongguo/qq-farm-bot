@@ -1,0 +1,38 @@
+# Active Task
+
+- Updated: 2026-07-15 09:53:59 +08:00
+- Status: complete
+- Mode: testing/stabilization
+- Project: QQ农场
+- Memory landing policy: ask-by-default
+- User goal: 登录/注册/卡密领取接入 HTTP rate-limit；正式提交并打 v2.3.2 tag
+- Touched modules: core/src/controllers/admin.js, core/src/services/security.js, core/test/http-security.test.js, CHANGELOG.md, README.md
+- Policy scope: rate-limit-and-release-v232
+- ExecutionPolicy: lite-anchor
+- ExecutionPolicy source: none
+- Execution protocol skills: none
+- Lite Demo role: memory-anchor
+- Scope: 公共写接口 HTTP 限流 + 回归测试 + git commit/tag v2.3.2
+- Last approved route: 复用 security.js rateLimitMiddleware 接到 login/register/card-claim
+- Interruption risk: low
+- Allowed changes: rate-limit、测试、文档、git commit/tag
+- Stable behavior: 多账号隔离；原子写入与 .bak；卡密预留；微信 API Key 仅后端；安全头与公开白名单；公开写接口限流
+- 稳定模块保护判断: 未改 worker/farm 主循环、未改 core/data 业务内容
+- Memory hygiene: task-local
+- Artifact discipline: 前端无逻辑改动
+- Encoding check: UTF-8 no BOM
+- Pressure signals: 发布与限流同做，保持补丁范围
+- Rejected approaches: 全站全局 rate limit；major 框架升级
+- Current step: None; task complete
+- Completed:
+  - login/register/card-claim IP 级 HTTP 限流（20/10/10 每分钟）
+  - security.js reset/cleanup 可测试
+  - http-security 测试扩展到 13 项并通过
+  - 准备 commit + tag v2.3.2
+- Next exact step: None; task complete
+- Validation gates: pnpm test 13/13；pnpm audit --prod clean
+- Regression guards: data-safety + http-security
+- Rollback/backups: git tag v2.3.2
+- Do not touch: core/data 业务数据；worker 主循环
+- Resume instruction: Archived only; create a new active-task for future work.
+- Route check: rate-limit 与发布完成

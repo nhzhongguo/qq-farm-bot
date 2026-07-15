@@ -1,0 +1,41 @@
+# Active Task
+
+- Updated: 2026-07-15 09:40:51 +08:00
+- Status: complete
+- Mode: testing/stabilization
+- Project: QQ农场
+- Memory landing policy: ask-by-default
+- User goal: 对项目进行持续升级；对照各大开源平台找可学习/可升级点
+- Touched modules: core/src/controllers/admin.js, core/test/http-security.test.js, package.json files, CHANGELOG.md, README.md
+- Policy scope: continuous-upgrade-oss
+- ExecutionPolicy: lite-anchor
+- ExecutionPolicy source: none
+- Execution protocol skills: none
+- Lite Demo role: memory-anchor
+- Scope: 开源对照 + HTTP 安全/鉴权白名单/依赖卫生；不做 major 框架升级
+- Last approved route: 先对照后落地低风险安全补丁
+- Interruption risk: low
+- Allowed changes: 安全头、鉴权白名单、测试、小依赖清理、文档
+- Stable behavior: 多账号隔离；原子写入与 .bak；卡密预留；微信 API Key 仅后端；重启不自动拉起全部账号；管理员首次强制改密
+- 稳定模块保护判断: 未改 worker/farm 主循环、未改 core/data 业务内容
+- Memory hygiene: task-local；学习笔记写入 capsule 而非硬规则
+- Artifact discipline: 前端无逻辑改动，未强制重建 dist
+- Encoding check: UTF-8 no BOM
+- Pressure signals: 持续升级已收窄
+- Rejected approaches: Express/Vite major；cookie 鉴权大迁移；架构重写
+- Current step: None; task complete
+- Completed:
+  - 开源安全实践对照并形成学习笔记
+  - HTTP 安全头 + 关闭 X-Powered-By
+  - 公共 API 白名单明确化（含 register/ping/card info）
+  - JSON body 1mb 限制
+  - 移除 node-fetch，改用原生 fetch
+  - 新增 http-security 测试；全量 10/10 通过
+  - 版本升至 2.3.2
+- Next exact step: None; task complete
+- Validation gates: pnpm test 10/10；pnpm audit --prod clean
+- Regression guards: data-safety + http-security
+- Rollback/backups: 可回退 git；未强制 tag
+- Do not touch: core/data 业务数据；worker 主循环
+- Resume instruction: Archived only; create a new active-task for future work.
+- Route check: 持续升级第一轮完成；后续 rate-limit/CSP 另开任务

@@ -1,0 +1,36 @@
+# Capsule: C02
+
+- Date: 2026-07-15
+- Project: QQ农场
+- Version: 2.3.2
+- Phase/mode: testing/stabilization
+- Module: auth-admin / deps-security
+- Question: 对照开源自托管面板与 Express 安全实践，本项目下一轮应升级什么？
+- Baseline: v2.3.1 已完成数据安全；HTTP 层缺安全头；/api 白名单不完整且 node-fetch 冗余；security.js 有限流能力但未接入主路径
+- Evidence:
+  - Express 社区通用实践：disable X-Powered-By、安全响应头、限制 body、公开路由最小化
+  - Vue/管理面板常见做法：token 放 localStorage + 拦截器；进阶是 HttpOnly Cookie（改动大）
+  - 本仓实现：core/src/controllers/admin.js 安全头 + 公共白名单；test/http-security.test.js 3 cases
+  - pnpm test 10/10；pnpm audit --prod clean
+- Rejected hypotheses: 必须立刻上 Express 5 / Vite 8 才算持续升级
+- Rejected approaches: 架构重写；cookie 鉴权大迁移；引入 helmet 仅为了几个固定头；触碰 worker/farm 协议
+- Pressure signals: “各大开源平台/持续升级”易导致大爆炸依赖升级
+- Pressure status: 已收窄为安全头 + 鉴权白名单 + 依赖卫生 + 学习对照
+- Stable behavior:
+  - 公共 API 白名单明确；其余要求 token
+  - 安全头默认开启；HTTPS 时附加 HSTS
+  - 登录限流/锁账号仍在 user-store 路径
+- 稳定模块保护判断: 未改 worker/farm 主循环与 core/data 业务内容
+- Memory hygiene: 开源对照作为可复用学习笔记；不把“必须 major 升级”写成硬规则
+- Run audit: green
+- Artifact discipline: 未强制重建 web/dist（前端无逻辑改动）
+- Encoding check: UTF-8
+- Regression guards:
+  - public routes 200 + security headers
+  - protected routes 401 without token
+  - login issues token then auth/validate 200
+  - data-safety 7 cases still pass
+- Judgment: v2.3.2 适合作为 HTTP 安全补丁；可学习但暂不落地的有 HTTP 登录限流中间件、HttpOnly Cookie、CSP
+- Open questions: 是否 git tag v2.3.2；是否下一轮接入登录接口 rate-limit
+- Next step: 无
+- Links: CHANGELOG.md, core/src/controllers/admin.js, core/test/http-security.test.js, docs/codex/tasks/continuous-upgrade-oss/active-task.md

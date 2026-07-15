@@ -1,0 +1,31 @@
+# Current Context
+
+- Updated: 2026-07-16 00:16:28 +08:00
+- Project: QQ农场
+- Project phase: testing/stabilization
+- Memory landing policy: ask-by-default
+- Module aliases:
+  - core-backend: core, client.js, Express, Socket.IO
+  - web-panel: web, Vue 3, Vite
+  - data-safety: atomic write, bak restore, cards/users/accounts
+  - auth-admin: x-admin-token, public allowlist, security headers, public rate-limit
+- Active version: 2.3.2
+- Active run: function-gap-audit (complete)
+- Active module: none
+- Baseline: local UI redesign commit 1020f49 on top of v2.3.2
+- Active hypothesis:
+- Known failures:
+  - 运行环境 pnpm 11.7.0 与 packageManager 声明 10.30.2 不一致（未强改）
+- Stable behavior: 多账号隔离；原子写入与 .bak；HTTP 限流；管理员强制改密；前端 Design System 已落地
+- 稳定模块保护判断: 数据安全与 HTTP 安全边界不动；业务自动化主流程不动
+- Memory hygiene: 临时请求/压力默认任务本地
+- Latest run audit: docs/codex/session-log.md#run-audit---2026-07-16---function-gap-audit
+- Artifact discipline: 审计报告与 docs/audit/sources 外部证据快照可复用
+- Encoding check: 审计与记忆 Markdown 严格 UTF-8、无 BOM、无 mojibake
+- Pressure signals:
+- Rejected approaches: major 依赖升级、架构重写、cookie 鉴权大迁移、全站全局限流、业务逻辑大重写
+- Regression guards: core/test/data-safety.test.js, core/test/http-security.test.js, web/e2e/auth-smoke.spec.ts
+- Evidence links: docs/audit/function-gap-audit-2026-07-15.md；docs/audit/sources/；docs/codex/capsules/C04-function-gap-audit.md；commit 1020f49；既有质量门 lint/test/build/e2e passed
+- Session log: docs/codex/session-log.md
+- Next step: 无活动任务；等待用户决定是否实施报告中的第一批 M2/M4/M5/M1/M10
+- Do not assume: 审计缺口尚未实现；提交与推送状态以当前 git/远端为准

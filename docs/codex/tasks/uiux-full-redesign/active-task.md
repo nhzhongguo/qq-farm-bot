@@ -1,0 +1,40 @@
+# Active Task
+
+- Updated: 2026-07-15 10:13:38 +08:00
+- Status: complete
+- Mode: scoped-build
+- Project: QQ农场
+- Memory landing policy: ask-by-default
+- User goal: 全面 UI/UX 重构升级（Design System → 壳层 → Login/Dashboard → 其余页面）
+- Touched modules: web/src/styles, composables/theme, stores/app, components/ui/*, layouts, Sidebar, Login, Dashboard, Personal, Friends, Analytics, Settings, AdminPanel, router
+- Policy scope: uiux-full-redesign
+- ExecutionPolicy: lite-anchor
+- ExecutionPolicy source: none
+- Execution protocol skills: none
+- Lite Demo role: memory-anchor
+- Scope: Design System 地基 + 壳层 + 关键页视觉升级 + 轻量性能/权限修补；不改 worker/core data
+- Last approved route: 用户确认分阶段实现
+- Interruption risk: low
+- Allowed changes: 前端 UI/主题/壳层/页面视觉
+- Stable behavior: 后端鉴权/限流/数据安全边界保持
+- 稳定模块保护判断: 未触碰 worker/farm 主循环与 core/data
+- Memory hygiene: task-local
+- Artifact discipline: web build 已通过
+- Encoding check: UTF-8 no BOM
+- Pressure signals: 全面重构已按阶段落地，避免特效堆叠
+- Rejected approaches: 大爆炸重写；粒子特效优先
+- Current step: None; task complete
+- Completed:
+  - Design tokens + 统一主题源
+  - Base UI / Toast / Confirm / PageHeader / EmptyState
+  - Layout/Sidebar 壳层升级 + LiveClock 降重渲染
+  - Login/Dashboard 重设计；Personal 升级；其余页 PageHeader + 主题色统一
+  - admin 前端路由守卫；Settings/Sidebar 轮询降频
+  - web build 通过
+- Next exact step: None; task complete
+- Validation gates: pnpm -C web build；pnpm test
+- Regression guards: 登录/切号/设置/后台关键路径需人工点验
+- Rollback/backups: git 可回退
+- Do not touch: core/data；worker 主循环
+- Resume instruction: Archived only; create a new active-task for future work.
+- Route check: UI 第一轮重构完成

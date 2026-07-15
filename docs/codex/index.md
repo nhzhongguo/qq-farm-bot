@@ -1,0 +1,35 @@
+# Context Index
+
+- Updated: 2026-07-16 00:16:28 +08:00
+- Project: QQ农场
+- Current anchor: none (last complete: tasks/function-gap-audit)
+- Memory landing policy: ask-by-default
+- Task branches:
+  - test-and-upgrade-v230: 全面测试与升级 / complete
+  - continuous-upgrade-oss: 持续升级与开源对照 / complete
+  - rate-limit-and-release-v232: 公开写接口限流与 v2.3.2 发布 / complete
+  - uiux-full-redesign: 第一轮 UI 重构 / complete
+  - friends-settings-e2e-ui-commit: Friends/Settings 深改 + e2e + commit / complete
+  - function-gap-audit: 三步功能缺口审计与行业矩阵 / complete
+- Active version: 2.3.2
+- Active topic: none
+- Project phase: testing/stabilization
+- Module aliases:
+  - core-backend: core, Express, worker
+  - web-panel: web, Vue, Vite
+  - data-safety: atomic write, bak restore, cards, accounts
+  - auth-admin: token auth, public allowlist, headers, rate-limit
+- Module index:
+  - data-safety: keywords=users.json,cards.json,accounts.json,atomic,.bak,card-claim,timingSafeEqual; route=C01-data-safety-upgrade; reason=v2.3.1 数据安全与备份加固
+  - auth-admin: keywords=login,register,card-claim,rate-limit,x-admin-token,security-headers,public-allowlist; route=C02-http-security-oss-upgrade; reason=v2.3.2 HTTP 安全、白名单与限流
+  - web-panel: keywords=vue,build,Friends,Settings,design-system,e2e,playwright; route=C03-uiux-analysis; reason=UI 重构批次 1020f49
+  - deps-security: keywords=pnpm audit,overrides,node-fetch,native-fetch; route=C02-http-security-oss-upgrade; reason=移除 node-fetch；prod audit 清洁
+  - function-gap-audit: keywords=功能缺口,已实现清单,半成品,行业矩阵,刚需必补,体验优化,长期拓展,n8n,Airflow,Kestra,ALAS; route=C04-function-gap-audit; reason=v2.3.2 三步功能补全审计结论与证据入口
+- Capsules:
+  - C01-data-safety-upgrade: 数据安全与备份升级 v2.3.1
+  - C02-http-security-oss-upgrade: HTTP 安全与开源对照升级 v2.3.2
+  - C02-learning-notes-oss: 开源项目对照学习记录
+  - C03-uiux-analysis: UI/UX 全面分析与设计方向
+  - C04-function-gap-audit: v2.3.2 功能缺口审计结论、优先级与证据入口
+- Session log: docs/codex/session-log.md
+- Evidence store: docs/codex/capsules/
