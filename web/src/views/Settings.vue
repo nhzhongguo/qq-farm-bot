@@ -7,6 +7,8 @@ import api from '@/api'
 import AccountModal from '@/components/AccountModal.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseSwitch from '@/components/ui/BaseSwitch.vue'
@@ -108,7 +110,7 @@ onMounted(async () => {
 
 useIntervalFn(() => {
   accountStore.fetchAccounts()
-}, 3000)
+}, 30000)
 
 function openSettings(account: any) {
   accountStore.selectAccount(account.id)
@@ -836,39 +838,48 @@ async function handleTestOffline() {
 </script>
 
 <template>
-  <div class="settings-page">
-    <div class="mb-4">
-      <h1 class="text-2xl text-gray-900 font-bold dark:text-gray-100">
-        设置
-      </h1>
+  <div class="ds-page">
+    <PageHeader title="系统设置" subtitle="账号、策略、自动化与用户安全">
+      <template #badges>
+        <span class="ds-chip ds-chip-brand">
+          <div class="i-carbon-settings" />
+          控制中心
+        </span>
+        <span class="ds-chip">
+          {{ tabs.find(t => t.key === activeTab)?.label || '设置' }}
+        </span>
+      </template>
+    </PageHeader>
+
+    <div class="flex gap-1 overflow-x-auto rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-1">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        class="min-w-[7.5rem] flex-1 rounded-lg px-3 py-2.5 text-sm font-semibold transition"
+        :class="activeTab === tab.key
+          ? 'bg-[var(--color-bg-surface)] text-[var(--theme-primary)] shadow-sm'
+          : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'"
+        @click="activeTab = tab.key"
+      >
+        <div class="flex items-center justify-center gap-2">
+          <div :class="tab.icon" />
+          <span>{{ tab.label }}</span>
+        </div>
+      </button>
     </div>
 
-    <div class="border border-gray-200 rounded-lg bg-white shadow dark:border-gray-700 dark:bg-gray-800">
-      <div class="border-b border-gray-200 dark:border-gray-700">
-        <nav class="flex gap-1 p-2">
-          <button
-            v-for="tab in tabs"
-            :key="tab.key"
-            class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all"
-            :class="activeTab === tab.key
-              ? 'text-white shadow-sm'
-              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'"
-            :style="activeTab === tab.key ? { backgroundColor: 'var(--theme-primary)' } : {}"
-            @click="activeTab = tab.key"
-          >
-            <div :class="tab.icon" />
-            {{ tab.label }}
-          </button>
-        </nav>
-      </div>
-
-      <div class="p-4">
+    <div class="min-w-0">
         <!-- 账号管理 -->
         <div v-if="activeTab === 'account'" class="space-y-4">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h3 class="text-lg text-gray-900 font-bold dark:text-gray-100">
-              账号管理
-            </h3>
+            <div>
+              <h3 class="text-lg font-bold text-[var(--color-text-primary)]">
+                账号管理
+              </h3>
+              <p class="mt-1 text-sm text-[var(--color-text-secondary)]">
+                管理农场账号启停、配额与基础信息
+              </p>
+            </div>
             <div class="flex flex-wrap gap-2">
               <BaseButton
                 v-if="userStore.isAdmin"
@@ -895,45 +906,46 @@ async function handleTestOffline() {
             </div>
           </div>
 
-          <div v-if="accountsLoading && accounts.length === 0" class="py-8 text-center text-gray-500">
-            <div i-svg-spinners-90-ring-with-bg class="mb-2 inline-block text-2xl" />
-            <div>加载中...</div>
+          <div v-if="accountsLoading && accounts.length === 0" class="ds-card flex flex-col items-center justify-center py-12 text-[var(--color-text-secondary)]">
+            <div class="i-svg-spinners-90-ring-with-bg mb-2 text-3xl text-[var(--theme-primary)]" />
+            <div class="text-sm">加载中...</div>
           </div>
 
-          <div v-else-if="accounts.length === 0" class="rounded-lg bg-white py-12 text-center shadow dark:bg-gray-800">
-            <div i-carbon-user-avatar class="mb-4 inline-block text-4xl text-gray-400" />
-            <p class="mb-4 text-gray-500">
-              暂无账号
-            </p>
-            <BaseButton
-              variant="text"
-              size="sm"
-              :disabled="isAddAccountDisabled"
-              :title="addAccountDisabledReason"
-              @click="openAddModal"
-            >
-              立即添加
-            </BaseButton>
-          </div>
+          <EmptyState
+            v-else-if="accounts.length === 0"
+            icon="i-carbon-user-avatar"
+            title="暂无账号"
+            description="添加农场账号后即可开始自动化运营"
+          >
+            <template #actions>
+              <BaseButton
+                variant="primary"
+                size="sm"
+                :disabled="isAddAccountDisabled"
+                :title="addAccountDisabledReason"
+                @click="openAddModal"
+              >
+                立即添加
+              </BaseButton>
+            </template>
+          </EmptyState>
 
           <div v-else class="grid grid-cols-1 gap-4 lg:grid-cols-3 sm:grid-cols-2 xl:grid-cols-4">
             <div
               v-for="acc in accounts"
               :key="acc.id"
-              class="cursor-pointer border rounded-lg bg-white p-3 shadow transition-all duration-200 dark:bg-gray-800 sm:p-4"
-              :class="String(currentAccountId) === String(acc.id)
-                ? 'ring-2'
-                : 'border-transparent'"
+              class="ds-card cursor-pointer p-3 sm:p-4"
+              :class="String(currentAccountId) === String(acc.id) ? 'ring-2 ring-[var(--theme-primary)]' : ''"
               :style="String(currentAccountId) === String(acc.id)
-                ? { borderColor: 'var(--theme-primary)', backgroundColor: 'rgba(var(--theme-primary-rgb, 59, 130, 246), 0.1)' }
+                ? { borderColor: 'var(--theme-primary)', backgroundColor: 'rgba(var(--theme-primary-rgb), 0.08)' }
                 : {}"
               @click="selectAccount(acc)"
             >
               <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div class="min-w-0 flex flex-1 items-center gap-3">
-                  <div class="h-10 w-10 flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-100 sm:h-12 sm:w-12 dark:bg-gray-700">
+                  <div class="h-10 w-10 flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-bg-subtle)] sm:h-12 sm:w-12">
                     <img v-if="acc.uin" :src="`https://q1.qlogo.cn/g?b=qq&nk=${acc.uin}&s=100`" class="h-full w-full object-cover">
-                    <div v-else class="i-carbon-user text-xl text-gray-400 sm:text-2xl" />
+                    <div v-else class="i-carbon-user text-xl text-[var(--color-text-tertiary)] sm:text-2xl" />
                   </div>
                   <div class="min-w-0 flex-1">
                     <h4 class="truncate text-base font-bold sm:text-lg">
@@ -947,14 +959,14 @@ async function handleTestOffline() {
                       >
                         {{ getPlatformLabel(acc.platform) }}
                       </span>
-                      <span class="truncate text-xs text-gray-500 sm:text-sm">
+                      <span class="truncate text-xs text-[var(--color-text-secondary)] sm:text-sm">
                         {{ acc.uin || '未绑定' }}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div class="flex items-center justify-end gap-2 sm:flex-col sm:items-end">
-                  <span class="flex items-center gap-1 text-xs text-gray-500 sm:hidden">
+                  <span class="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] sm:hidden">
                     <div class="h-2 w-2 rounded-full" :class="acc.running ? 'bg-green-500' : 'bg-gray-300'" />
                     {{ acc.running ? '运行中' : '已停止' }}
                   </span>
@@ -973,8 +985,8 @@ async function handleTestOffline() {
                 </div>
               </div>
 
-              <div class="mt-3 flex items-center justify-between border-t border-gray-100 pt-3 sm:mt-4 dark:border-gray-700 sm:pt-4">
-                <div class="hidden items-center gap-2 text-sm text-gray-500 sm:flex">
+              <div class="mt-3 flex items-center justify-between border-t border-[var(--color-border-default)] pt-3 sm:mt-4 sm:pt-4">
+                <div class="hidden items-center gap-2 text-sm text-[var(--color-text-secondary)] sm:flex">
                   <span class="flex items-center gap-1">
                     <div class="h-2 w-2 rounded-full" :class="acc.running ? 'bg-green-500' : 'bg-gray-300'" />
                     {{ acc.running ? '运行中' : '已停止' }}
@@ -1085,7 +1097,7 @@ async function handleTestOffline() {
                 :options="preferredSeedOptions"
               />
               <div v-else class="flex flex-col gap-1.5">
-                <label class="text-sm text-gray-700 font-medium dark:text-gray-300">
+                <label class="text-sm font-medium text-[var(--color-text-secondary)]">
                   {{ localStrategySettings.plantingStrategy === 'bag_priority' ? '第二优先策略预览' : '策略选种预览' }}
                 </label>
                 <div
@@ -1239,7 +1251,7 @@ async function handleTestOffline() {
             </div>
 
             <div class="border-t pt-3 space-y-3 dark:border-gray-700">
-              <h4 class="text-sm text-gray-700 font-medium dark:text-gray-300">
+              <h4 class="text-sm font-medium text-[var(--color-text-secondary)]">
                 种植与偷菜延迟设置
               </h4>
               <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -1278,7 +1290,7 @@ async function handleTestOffline() {
         <!-- 自动控制 -->
         <div v-else-if="activeTab === 'automation'" class="space-y-4">
           <div class="flex items-center justify-between">
-            <h3 class="text-lg text-gray-900 font-bold dark:text-gray-100">
+            <h3 class="text-lg font-bold text-[var(--color-text-primary)]">
               自动控制
               <span v-if="currentAccountName" class="ml-2 text-sm text-gray-500 font-normal dark:text-gray-400">
                 ({{ currentAccountName }})
@@ -1442,13 +1454,18 @@ async function handleTestOffline() {
 
         <!-- 用户管理 -->
         <div v-else-if="activeTab === 'user'" class="space-y-4">
-          <h3 class="text-lg text-gray-900 font-bold dark:text-gray-100">
-            用户管理
-          </h3>
+          <div>
+            <h3 class="text-lg font-bold text-[var(--color-text-primary)]">
+              用户管理
+            </h3>
+            <p class="mt-1 text-sm text-[var(--color-text-secondary)]">
+              修改登录密码并配置下线提醒通道
+            </p>
+          </div>
 
           <div class="space-y-4">
-            <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-              <h4 class="mb-3 flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
+            <div class="ds-card p-4">
+              <h4 class="mb-3 flex items-center gap-2 text-base font-bold text-[var(--color-text-primary)]">
                 <div class="i-carbon-password" />
                 修改用户密码
               </h4>
@@ -1488,8 +1505,8 @@ async function handleTestOffline() {
               </div>
             </div>
 
-            <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-              <h4 class="mb-3 flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
+            <div class="ds-card p-4">
+              <h4 class="mb-3 flex items-center gap-2 text-base font-bold text-[var(--color-text-primary)]">
                 <div class="i-carbon-notification" />
                 下线提醒
               </h4>
@@ -1498,7 +1515,7 @@ async function handleTestOffline() {
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div class="flex flex-col gap-1.5">
                     <div class="flex items-center justify-between">
-                      <span class="text-sm text-gray-700 font-medium dark:text-gray-300">推送渠道</span>
+                      <span class="text-sm font-medium text-[var(--color-text-secondary)]">推送渠道</span>
                       <BaseButton
                         variant="text"
                         size="sm"
@@ -1581,7 +1598,6 @@ async function handleTestOffline() {
             </div>
           </div>
         </div>
-      </div>
     </div>
 
     <ConfirmModal

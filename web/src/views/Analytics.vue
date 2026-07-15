@@ -3,6 +3,7 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
 import { usePlantBlacklistStore } from '@/stores/plant-blacklist'
 import { useStatusStore } from '@/stores/status'
@@ -128,7 +129,7 @@ function getColorClass(color: string, type: 'bg' | 'text' | 'border' | 'gradient
     },
     blue: {
       bg: 'bg-blue-100 dark:bg-blue-900/30',
-      text: 'text-blue-600 dark:text-blue-400',
+      text: 'text-[var(--theme-primary)] dark:text-blue-400',
       border: 'border-blue-200 dark:border-blue-800',
       gradient: 'from-blue-500 to-blue-600',
     },
@@ -308,12 +309,13 @@ function formatGrowTime(seconds: any) {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="ds-page">
+    <PageHeader title="作物分析" subtitle="策略推荐、收益对比与黑名单" />
     <div class="flex gap-2 border-b border-gray-200 dark:border-gray-700">
       <button
         class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
         :class="activeTab === 'crops'
-          ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+          ? 'border-[var(--theme-primary)] text-[var(--theme-primary)] dark:border-blue-400 dark:text-blue-400'
           : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
         @click="activeTab = 'crops'"
       >
@@ -328,7 +330,7 @@ function formatGrowTime(seconds: any) {
       <button
         class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
         :class="activeTab === 'blacklist'
-          ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+          ? 'border-[var(--theme-primary)] text-[var(--theme-primary)] dark:border-blue-400 dark:text-blue-400'
           : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
         @click="activeTab = 'blacklist'"
       >
@@ -343,7 +345,7 @@ function formatGrowTime(seconds: any) {
       <button
         class="border-b-2 px-4 py-2 text-sm font-medium transition-colors"
         :class="activeTab === 'strategy'
-          ? 'border-blue-500 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+          ? 'border-[var(--theme-primary)] text-[var(--theme-primary)] dark:border-blue-400 dark:text-blue-400'
           : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
         @click="activeTab = 'strategy'"
       >
@@ -453,7 +455,7 @@ function formatGrowTime(seconds: any) {
                 </div>
                 <div class="flex flex-col">
                   <span class="text-xs text-gray-500">普肥经验/时</span>
-                  <span class="text-blue-600 font-bold dark:text-blue-400">{{ item.normalFertilizerExpPerHour ?? '-' }}</span>
+                  <span class="text-[var(--theme-primary)] font-bold dark:text-blue-400">{{ item.normalFertilizerExpPerHour ?? '-' }}</span>
                 </div>
                 <div class="flex flex-col">
                   <span class="text-xs text-gray-500">普肥利润/时</span>
@@ -543,7 +545,7 @@ function formatGrowTime(seconds: any) {
                       </div>
                     </td>
                     <td class="px-4 py-2 text-right">
-                      <div class="text-blue-600 font-bold dark:text-blue-400">
+                      <div class="text-[var(--theme-primary)] font-bold dark:text-blue-400">
                         {{ item.normalFertilizerExpPerHour ?? '-' }}
                       </div>
                     </td>
@@ -613,7 +615,7 @@ function formatGrowTime(seconds: any) {
           </div>
         </div>
 
-        <div class="p-4">
+        <div class="ds-page">
           <div v-if="blacklist.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
             暂无黑名单蔬菜
           </div>
@@ -680,7 +682,7 @@ function formatGrowTime(seconds: any) {
           </div>
         </div>
 
-        <div class="p-4">
+        <div class="ds-page">
           <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <div
               v-for="strategy in strategies"

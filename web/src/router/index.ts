@@ -8,7 +8,7 @@ import 'nprogress/nprogress.css'
 NProgress.configure({ showSpinner: false })
 
 const adminToken = useStorage('admin_token', '')
-const userInfo = useStorage<{ mustChangePassword?: boolean } | null>('user_info', null)
+const userInfo = useStorage<{ mustChangePassword?: boolean, role?: string } | null>('user_info', null)
 let validatedToken = ''
 let validatingPromise: Promise<boolean> | null = null
 
@@ -89,6 +89,10 @@ router.beforeEach(async (to, _from) => {
   if (userInfo.value?.mustChangePassword && to.name !== 'Settings') {
     localStorage.setItem('settings-active-tab', 'user')
     return { name: 'Settings' }
+  }
+
+  if (to.name === 'admin' && userInfo.value?.role !== 'admin') {
+    return { name: 'dashboard' }
   }
 
   return true

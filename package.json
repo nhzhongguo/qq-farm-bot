@@ -17,6 +17,7 @@
     "package:linux": "pnpm build:web && pnpm -C core build:linux",
     "package:mac": "pnpm build:web && pnpm -C core build:mac",
     "package:release": "pnpm build:web && pnpm -C core build:release",
-    "install:all": "pnpm install -r"
+    "install:all": "pnpm install -r",
+    "test:e2e": "pnpm -C web test:e2e"
   }
 }

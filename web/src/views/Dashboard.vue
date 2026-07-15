@@ -6,6 +6,8 @@ import api from '@/api'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { useAccountStore } from '@/stores/account'
 import { useBagStore } from '@/stores/bag'
 import { useStatusStore } from '@/stores/status'
@@ -448,300 +450,191 @@ useIntervalFn(updateCountdowns, 1000)
 </script>
 
 <template>
-  <div class="flex flex-col gap-6 pt-6">
-    <!-- Status Cards -->
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 sm:grid-cols-2">
-      <!-- Account & Exp -->
-      <div class="flex flex-col rounded-lg bg-white p-4 shadow dark:bg-gray-800">
-        <div class="mb-2 flex items-start justify-between">
-          <div class="flex items-center gap-1.5 text-sm text-gray-500">
-            <div class="i-fas-user-circle" />
-            账号
-          </div>
-          <div class="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-            Lv.{{ status?.status?.level || 0 }}
-          </div>
-        </div>
-        <div class="mb-1 truncate text-xl font-bold" :title="displayName">
-          {{ displayName }}
-        </div>
+  <div class="ds-page">
+    <PageHeader
+      title="运营概览"
+      subtitle="实时查看账号状态、资产效率与运行日志"
+    >
+      <template #badges>
+        <span class="ds-chip" :class="status?.connection?.connected ? 'ds-chip-success' : 'ds-chip-warning'">
+          <div :class="status?.connection?.connected ? 'i-carbon-checkmark-filled' : 'i-carbon-warning'" />
+          {{ status?.connection?.connected ? '账号已连接' : '账号未连接' }}
+        </span>
+        <span class="ds-chip" :class="realtimeConnected ? 'ds-chip-brand' : ''">
+          <div :class="realtimeConnected ? 'i-carbon-wifi' : 'i-carbon-wifi-off'" />
+          {{ realtimeConnected ? '实时通道在线' : '实时通道断开' }}
+        </span>
+      </template>
+      <template #actions>
+        <BaseButton variant="secondary" @click="refresh(true)">
+          <div class="i-carbon-renew" />
+          刷新
+        </BaseButton>
+      </template>
+    </PageHeader>
 
-        <!-- Level Progress -->
-        <div class="mt-auto">
-          <div class="mb-1 flex justify-between text-xs text-gray-500">
-            <div class="flex items-center gap-1">
-              <div class="i-fas-bolt text-blue-400" />
-              <span>EXP</span>
+    <div class="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+      <!-- Profile + assets -->
+      <section class="ds-card p-5">
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-stretch">
+          <div class="min-w-0 flex-1">
+            <div class="mb-2 flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
+              <div class="i-carbon-user-avatar" />
+              当前账号
             </div>
-            <span>{{ status?.levelProgress?.current || 0 }} / {{ status?.levelProgress?.needed || '?' }}</span>
+            <div class="truncate text-2xl font-bold tracking-tight" :title="displayName">
+              {{ displayName }}
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <span class="ds-chip ds-chip-brand">Lv.{{ status?.status?.level || 0 }}</span>
+              <span class="ds-chip">效率 {{ expRate }}</span>
+              <span class="ds-chip">{{ timeToLevel }}</span>
+            </div>
+            <div class="mt-5">
+              <div class="mb-1.5 flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
+                <span class="inline-flex items-center gap-1"><div class="i-fas-bolt text-[var(--theme-primary)]" /> EXP</span>
+                <span>{{ status?.levelProgress?.current || 0 }} / {{ status?.levelProgress?.needed || '?' }}</span>
+              </div>
+              <div class="h-2 overflow-hidden rounded-full bg-[var(--color-bg-subtle)]">
+                <div
+                  class="h-full rounded-full transition-all duration-500"
+                  :style="{ width: `${getExpPercent(status?.levelProgress)}%`, backgroundImage: 'var(--theme-gradient)' }"
+                />
+              </div>
+            </div>
           </div>
-          <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
-            <div
-              class="h-full rounded-full bg-blue-500 transition-all duration-500"
-              :style="{ width: `${getExpPercent(status?.levelProgress)}%` }"
-            />
-          </div>
-          <div class="mt-2 flex justify-between text-xs text-gray-400">
-            <span>效率: {{ expRate }}</span>
-            <span>{{ timeToLevel }}</span>
-          </div>
-        </div>
-      </div>
 
-      <!-- Assets & Status -->
-      <div class="flex flex-col justify-between rounded-lg bg-white p-4 shadow dark:bg-gray-800">
-        <div class="flex justify-between">
-          <div>
-            <div class="flex items-center gap-1.5 text-xs text-gray-500">
-              <div class="i-fas-coins text-yellow-500" />
-              金币
+          <div class="grid min-w-0 flex-1 grid-cols-3 gap-2">
+            <div class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
+              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]"><div class="i-fas-coins text-yellow-500" />金币</div>
+              <div class="mt-2 text-lg font-bold text-yellow-600 dark:text-yellow-400">{{ status?.status?.gold || 0 }}</div>
             </div>
-            <div class="text-2xl text-yellow-600 font-bold dark:text-yellow-500">
-              {{ status?.status?.gold || 0 }}
+            <div class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
+              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]"><div class="i-carbon-ticket text-sky-500" />点券</div>
+              <div class="mt-2 text-lg font-bold">{{ status?.status?.coupon || 0 }}</div>
             </div>
-            <div
-              v-if="(status?.sessionGoldGained || 0) !== 0"
-              class="text-[10px]"
-              :class="(status?.sessionGoldGained || 0) > 0 ? 'text-green-500' : 'text-red-500'"
-            >
-              {{ (status?.sessionGoldGained || 0) > 0 ? '+' : '' }}{{ status?.sessionGoldGained || 0 }}
-            </div>
-          </div>
-          <div class="text-right">
-            <div class="flex items-center justify-end gap-1.5 text-xs text-gray-500">
-              <div class="i-fas-ticket-alt text-emerald-400" />
-              点券
-            </div>
-            <div class="text-2xl text-emerald-500 font-bold dark:text-emerald-400">
-              {{ status?.status?.coupon || 0 }}
-            </div>
-            <div
-              v-if="(status?.sessionCouponGained || 0) !== 0"
-              class="text-[10px]"
-              :class="(status?.sessionCouponGained || 0) > 0 ? 'text-green-500' : 'text-red-500'"
-            >
-              {{ (status?.sessionCouponGained || 0) > 0 ? '+' : '' }}{{ status?.sessionCouponGained || 0 }}
-            </div>
-          </div>
-          <div class="text-right">
-            <div class="flex items-center justify-end gap-1.5 text-xs text-gray-500">
-              <div class="i-carbon-information text-amber-500" />
-              金豆豆
-            </div>
-            <div class="text-2xl text-amber-500 font-bold dark:text-amber-400">
-              {{ status?.status?.goldBean || 0 }}
+            <div class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
+              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]"><div class="i-carbon-circle-filled text-amber-500" />金豆</div>
+              <div class="mt-2 text-lg font-bold">{{ status?.status?.goldBean || 0 }}</div>
             </div>
           </div>
         </div>
-        <div class="mt-4 border-t border-gray-100 pt-3 dark:border-gray-700">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="h-2.5 w-2.5 rounded-full" :class="status?.connection?.connected ? 'bg-green-500' : 'bg-red-500'" />
-              <span class="text-xs font-bold">{{ status?.connection?.connected ? '在线' : '离线' }}</span>
-            </div>
-            <div class="flex items-center gap-1.5 text-xs text-gray-400">
-              <div class="i-fas-clock text-purple-400" />
-              {{ formatDuration(localUptime) }}
-            </div>
-          </div>
-        </div>
-      </div>
+      </section>
 
-      <!-- Items (Fertilizer & Collection) -->
-      <div class="flex flex-col justify-between rounded-lg bg-white p-4 shadow dark:bg-gray-800">
-        <div class="mb-2 flex items-center gap-1.5 text-sm text-gray-500">
-          <div class="i-fas-flask text-emerald-400" />
-          化肥容器
+      <!-- Next checks -->
+      <section class="ds-card p-5">
+        <div class="mb-4 flex items-center gap-2 text-lg font-semibold">
+          <div class="i-carbon-hourglass text-[var(--theme-primary)]" />
+          下次巡查
         </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <div class="flex items-center gap-1 text-xs text-gray-400">
-              <div class="i-fas-flask text-emerald-400" />
-              普通
+        <div class="space-y-3">
+          <div class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-3">
+            <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+              <div class="i-carbon-sprout text-[var(--color-success)]" />
+              农场
             </div>
-            <div class="font-bold">
-              {{ formatBucketTime(fertilizerNormal) }}
-            </div>
+            <div class="font-mono text-base font-bold">{{ nextFarmCheck }}</div>
           </div>
-          <div>
-            <div class="flex items-center gap-1 text-xs text-gray-400">
-              <div class="i-fas-vial text-emerald-400" />
-              有机
+          <div class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-3">
+            <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+              <div class="i-carbon-user-multiple text-[var(--theme-primary)]" />
+              好友
             </div>
-            <div class="font-bold">
-              {{ formatBucketTime(fertilizerOrganic) }}
-            </div>
+            <div class="font-mono text-base font-bold">{{ nextFriendCheck }}</div>
           </div>
         </div>
-        <div class="my-2 border-t border-gray-100 dark:border-gray-700" />
-        <div class="mb-1 flex items-center gap-1.5 text-sm text-gray-500">
-          <div class="i-fas-star text-emerald-400" />
-          收藏点
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <div class="flex items-center gap-1 text-xs text-gray-400">
-              <div class="i-fas-bookmark text-emerald-400" />
-              普通
-            </div>
-            <div class="font-bold">
-              {{ collectionNormal?.count || 0 }}
-            </div>
-          </div>
-          <div>
-            <div class="flex items-center gap-1 text-xs text-gray-400">
-              <div class="i-fas-gem text-emerald-400" />
-              典藏
-            </div>
-            <div class="font-bold">
-              {{ collectionRare?.count || 0 }}
-            </div>
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
 
-    <!-- Main Content Flex -->
-    <div class="flex flex-1 flex-col items-stretch gap-6 md:flex-row">
-      <!-- Logs (Left Column) -->
-      <div class="flex flex-1 flex-col gap-6 md:w-3/4">
-        <!-- Logs -->
-        <div class="flex flex-1 flex-col rounded-lg bg-white p-6 shadow md:overflow-hidden dark:bg-gray-800">
-          <div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h3 class="flex items-center gap-2 text-lg font-medium">
-              <div class="i-carbon-document" />
-              <span>运行日志</span>
-            </h3>
-
-            <div class="flex flex-wrap items-center gap-2 text-sm">
-              <BaseSelect
-                v-model="filter.module"
-                :options="modules"
-                class="w-32"
-                @change="onLogFilterChange"
-              />
-
-              <BaseSelect
-                v-model="filter.event"
-                :options="events"
-                class="w-32"
-                @change="onLogFilterChange"
-              />
-
-              <BaseSelect
-                v-model="filter.isWarn"
-                :options="logs"
-                class="w-32"
-                @change="onLogFilterChange"
-              />
-
-              <BaseInput
-                v-model="filter.keyword"
-                placeholder="关键词..."
-                class="w-32"
-                clearable
-                @keyup.enter="onLogSearchTrigger"
-                @clear="onLogSearchTrigger"
-              />
-
-              <BaseButton
-                variant="primary"
-                size="sm"
-                @click="onLogSearchTrigger"
-              >
-                <div class="i-carbon-search" />
-              </BaseButton>
-
-              <BaseButton
-                variant="secondary"
-                size="sm"
-                :loading="clearingLogs"
-                @click="clearLogs"
-              >
-                <div class="i-carbon-trash-can" />
-              </BaseButton>
-            </div>
+    <div class="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
+      <!-- Logs -->
+      <section class="ds-card flex min-h-[28rem] flex-col overflow-hidden">
+        <div class="flex flex-col gap-3 border-b border-[var(--color-border-default)] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex items-center gap-2 text-lg font-semibold">
+            <div class="i-carbon-cloud-logging text-[var(--theme-primary)]" />
+            运行日志
           </div>
-
-          <div ref="logContainer" class="max-h-[50vh] min-h-0 flex-1 overflow-y-auto rounded bg-gray-50 p-4 text-sm leading-relaxed font-mono dark:bg-gray-900" @scroll="onLogScroll">
-            <div v-if="!allLogs.length" class="py-8 text-center text-gray-400">
-              暂无日志
-            </div>
-            <div v-for="log in allLogs" :key="log.ts + log.msg" class="mb-1 break-all">
-              <span class="mr-2 select-none text-gray-400">[{{ formatLogTime(log.time) }}]</span>
-              <span class="mr-2 rounded px-1.5 py-0.5 text-xs font-bold" :class="getLogTagClass(log.tag)">{{ log.tag }}</span>
-              <span v-if="log.meta?.event" class="mr-2 rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-500 dark:bg-blue-900/20 dark:text-blue-400">{{ getEventLabel(log.meta.event) }}</span>
-              <span :class="getLogMsgClass(log.tag)">{{ log.msg }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Column Stack -->
-      <div class="flex flex-col gap-6 md:w-1/4">
-        <!-- Next Checks -->
-        <div class="flex flex-col rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-          <h3 class="mb-4 flex items-center gap-2 text-lg font-medium">
-            <div class="i-carbon-hourglass" />
-            <span>下次巡查倒计时</span>
-          </h3>
-          <div class="flex flex-col justify-center gap-4">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <div class="i-carbon-sprout text-lg text-green-500" />
-                <span>农场</span>
-              </div>
-              <div class="text-lg font-bold font-mono">
-                {{ nextFarmCheck }}
-              </div>
-            </div>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <div class="i-carbon-user-multiple text-lg text-blue-500" />
-                <span>好友</span>
-              </div>
-              <div class="text-lg font-bold font-mono">
-                {{ nextFriendCheck }}
-              </div>
-            </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <BaseSelect v-model="filter.module" class="w-36" :options="modules" @update:model-value="onLogFilterChange" />
+            <BaseSelect v-model="filter.event" class="w-40" :options="events" @update:model-value="onLogFilterChange" />
+            <BaseSelect v-model="filter.isWarn" class="w-32" :options="logs" @update:model-value="onLogFilterChange" />
+            <BaseInput v-model="filter.keyword" class="w-40" placeholder="关键词" @keyup.enter="onLogSearchTrigger" />
+            <BaseButton variant="secondary" size="sm" @click="onLogSearchTrigger">筛选</BaseButton>
+            <BaseButton variant="danger" size="sm" :loading="clearingLogs" @click="clearLogs">清空</BaseButton>
           </div>
         </div>
 
-        <!-- Operations Grid -->
-        <div class="flex-1 rounded-lg bg-white p-4 shadow dark:bg-gray-800">
-          <h3 class="mb-3 flex items-center gap-2 text-lg font-medium">
-            <div class="i-carbon-chart-column" />
-            <span>今日统计</span>
-          </h3>
-          <div v-if="!status?.connection?.connected" class="flex flex-col items-center justify-center gap-4 rounded-lg bg-white p-12 text-center text-gray-500 shadow dark:bg-gray-800">
-            <div class="i-carbon-connection-signal-off text-4xl text-gray-400" />
-            <div class="flex flex-col">
-              <div class="text-lg text-gray-700 font-medium dark:text-gray-300">
-                账号未登录
-              </div>
-              <div class="mt-1 text-sm text-gray-400">
-                请先运行账号或检查网络连接
-              </div>
-            </div>
+        <div ref="logContainer" class="custom-scrollbar flex-1 overflow-y-auto p-4 font-mono text-xs leading-6" @scroll="onLogScroll">
+          <EmptyState
+            v-if="!allLogs.length"
+            icon="i-carbon-document-blank"
+            title="暂无日志"
+            description="运行账号后，实时日志会显示在这里"
+          />
+          <div v-for="log in allLogs" :key="`${log.ts}-${log.tag}-${log.msg}`" class="mb-1 break-all">
+            <span class="mr-2 select-none text-[var(--color-text-tertiary)]">[{{ formatLogTime(log.time) }}]</span>
+            <span class="mr-2 rounded px-1.5 py-0.5 text-[10px] font-bold" :class="getLogTagClass(log.tag)">{{ log.tag }}</span>
+            <span v-if="log.meta?.event" class="mr-2 rounded bg-[rgba(var(--theme-primary-rgb),0.1)] px-1.5 py-0.5 text-[10px] text-[var(--theme-primary)]">{{ getEventLabel(log.meta.event) }}</span>
+            <span :class="getLogMsgClass(log.tag)">{{ log.msg }}</span>
           </div>
-          <div v-else class="grid grid-cols-2 gap-2 2xl:gap-3">
+        </div>
+      </section>
+
+      <!-- Today stats + bags -->
+      <div class="flex flex-col gap-4">
+        <section class="ds-card p-4">
+          <div class="mb-3 flex items-center gap-2 text-lg font-semibold">
+            <div class="i-carbon-chart-column text-[var(--theme-primary)]" />
+            今日统计
+          </div>
+          <EmptyState
+            v-if="!status?.connection?.connected"
+            icon="i-carbon-connection-signal-off"
+            title="账号未登录"
+            description="请先运行账号或检查网络连接"
+          />
+          <div v-else class="grid grid-cols-2 gap-2">
             <div
               v-for="(val, key) in filteredOperations"
               :key="key"
-              class="flex items-center justify-between rounded bg-gray-50 px-3 py-2 dark:bg-gray-700/30"
+              class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-2"
             >
               <div class="flex items-center gap-2">
-                <div class="text-base 2xl:text-lg" :class="[getOpIcon(key), getOpColor(key)]" />
-                <div class="text-xs text-gray-500 2xl:text-sm">
-                  {{ getOpName(key) }}
-                </div>
+                <div class="text-base" :class="[getOpIcon(key), getOpColor(key)]" />
+                <div class="text-xs text-[var(--color-text-secondary)]">{{ getOpName(key) }}</div>
               </div>
-              <div class="text-sm font-bold 2xl:text-base">
-                {{ val }}
-              </div>
+              <div class="text-sm font-bold">{{ val }}</div>
             </div>
           </div>
-        </div>
+        </section>
+
+        <section class="ds-card p-4">
+          <div class="mb-3 flex items-center gap-2 text-lg font-semibold">
+            <div class="i-carbon-inventory-management text-[var(--theme-primary)]" />
+            关键物资
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="rounded-xl border border-[var(--color-border-default)] p-3">
+              <div class="text-xs text-[var(--color-text-tertiary)]">普通化肥</div>
+              <div class="mt-1 text-lg font-bold">{{ fertilizerNormal?.count || 0 }}</div>
+            </div>
+            <div class="rounded-xl border border-[var(--color-border-default)] p-3">
+              <div class="text-xs text-[var(--color-text-tertiary)]">有机化肥</div>
+              <div class="mt-1 text-lg font-bold">{{ fertilizerOrganic?.count || 0 }}</div>
+            </div>
+            <div class="rounded-xl border border-[var(--color-border-default)] p-3">
+              <div class="text-xs text-[var(--color-text-tertiary)]">普通收藏</div>
+              <div class="mt-1 text-lg font-bold">{{ collectionNormal?.count || 0 }}</div>
+            </div>
+            <div class="rounded-xl border border-[var(--color-border-default)] p-3">
+              <div class="text-xs text-[var(--color-text-tertiary)]">稀有收藏</div>
+              <div class="mt-1 text-lg font-bold">{{ collectionRare?.count || 0 }}</div>
+            </div>
+          </div>
+          <div v-if="fertilizerNormal || fertilizerOrganic" class="mt-3 text-xs text-[var(--color-text-tertiary)]">
+            普通桶 {{ formatBucketTime(fertilizerNormal) }} · 有机桶 {{ formatBucketTime(fertilizerOrganic) }}
+          </div>
+        </section>
       </div>
     </div>
   </div>

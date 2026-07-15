@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSwitch from '@/components/ui/BaseSwitch.vue'
 import { useToastStore } from '@/stores/toast'
@@ -826,12 +827,7 @@ onMounted(() => {
 
 <template>
   <div class="admin-panel">
-    <div class="mb-4">
-      <h1 class="flex items-center gap-2 text-2xl text-gray-900 font-bold dark:text-gray-100">
-        <div class="i-fas-user-shield text-lg" />
-        后台管理
-      </h1>
-    </div>
+    <PageHeader title="管理后台" subtitle="卡密、用户、日志与系统配置" />
 
     <div class="border border-gray-200 rounded-lg bg-white shadow dark:border-gray-700 dark:bg-gray-800">
       <div class="border-b border-gray-200 dark:border-gray-700">
@@ -852,7 +848,7 @@ onMounted(() => {
         </nav>
       </div>
 
-      <div class="p-4">
+      <div class="ds-page">
         <!-- 卡密管理 -->
         <div v-if="activeTab === 'card'" class="space-y-4">
           <div class="flex items-center justify-between">
@@ -1504,7 +1500,7 @@ onMounted(() => {
             系统配置
           </h3>
 
-          <div class="space-y-4">
+          <div class="ds-page">
             <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
               <h4 class="mb-3 flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
                 <div class="i-carbon-settings" />

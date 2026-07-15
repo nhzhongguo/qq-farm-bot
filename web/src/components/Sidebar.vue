@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { useDateFormat, useIntervalFn, useNow } from '@vueuse/core'
+import { useIntervalFn } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import AccountModal from '@/components/AccountModal.vue'
 import RemarkModal from '@/components/RemarkModal.vue'
+import LiveClock from '@/components/ui/LiveClock.vue'
 
 import { menuRoutes } from '@/router/menu'
 import { getPlatformClass, getPlatformLabel, useAccountStore } from '@/stores/account'
@@ -33,8 +34,6 @@ const systemConnected = ref(true)
 const serverUptimeBase = ref(0)
 const serverVersion = ref('')
 const lastPingTime = ref(Date.now())
-const now = useNow()
-const formattedTime = useDateFormat(now, 'YYYY-MM-DD HH:mm:ss')
 
 async function checkConnection() {
   try {
@@ -101,7 +100,7 @@ useIntervalFn(checkConnection, 30000)
 useIntervalFn(() => {
   refreshStatusFallback()
   accountStore.fetchAccounts()
-}, 10000)
+}, 30000)
 
 watch(() => currentAccount.value?.id || currentAccount.value?.uin || '', () => {
   const accountRef = currentAccount.value?.id || currentAccount.value?.uin
@@ -124,13 +123,6 @@ watch(() => status.value?.wsError, (wsError: any) => {
   showAccountModal.value = true
 }, { deep: true })
 
-const uptime = computed(() => {
-  const diff = Math.floor(serverUptimeBase.value + (now.value.getTime() - lastPingTime.value) / 1000)
-  const h = Math.floor(diff / 3600)
-  const m = Math.floor((diff % 3600) / 60)
-  const s = diff % 60
-  return `${h}h ${m}m ${s}s`
-})
 
 const displayName = computed(() => {
   const acc = currentAccount.value
@@ -413,12 +405,12 @@ async function copyToken() {
 
 <template>
   <aside
-    class="fixed inset-y-0 left-0 z-50 h-full w-64 flex flex-col border-r border-gray-200/50 transition-transform duration-300 lg:static lg:translate-x-0 dark:border-gray-700/50"
+    class="fixed inset-y-0 left-0 z-[var(--z-sidebar)] h-full w-[var(--sidebar-width)] flex flex-col border-r border-[var(--color-border-default)] bg-[color-mix(in_srgb,var(--color-bg-surface)_88%,transparent)] shadow-[var(--shadow-sm)] backdrop-blur-xl transition-transform duration-300 lg:static lg:translate-x-0"
     :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
-    :style="{ background: 'var(--theme-bg)', color: 'var(--theme-text)' }"
+    :style="{ color: 'var(--theme-text)' }"
   >
     <!-- Brand -->
-    <div class="h-16 flex items-center justify-between border-b border-gray-200/50 px-6 dark:border-gray-700/50">
+    <div class="h-[var(--header-height)] flex items-center justify-between border-b border-[var(--color-border-default)] px-5">
       <div class="flex items-center gap-3">
         <div class="i-carbon-sprout text-2xl" :style="{ color: 'var(--theme-primary)' }" />
         <span class="bg-clip-text text-lg text-transparent font-bold" :style="{ backgroundImage: 'var(--theme-gradient)' }">
@@ -438,7 +430,7 @@ async function copyToken() {
     <div class="border-b border-gray-200/50 p-4 dark:border-gray-700/50">
       <div class="group relative">
         <button
-          class="w-full flex items-center justify-between border border-transparent rounded-xl bg-gray-100/50 px-4 py-2.5 outline-none transition-all duration-200 hover:border-gray-300 dark:bg-gray-700/30 hover:bg-gray-200/50 dark:hover:border-gray-600 dark:hover:bg-gray-700/50"
+          class="w-full flex items-center justify-between rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] px-4 py-2.5 outline-none transition-all duration-200 hover:border-[color-mix(in_srgb,var(--theme-primary)_35%,var(--color-border-default))] hover:bg-[color-mix(in_srgb,var(--theme-primary)_8%,var(--color-bg-subtle))]"
           style="--focus-ring: var(--theme-primary)"
           @click="showUserDropdown = !showUserDropdown"
         >
@@ -723,11 +715,11 @@ async function copyToken() {
           />
           <span>{{ connectionStatus.text }}</span>
         </div>
-        <span>{{ uptime }}</span>
+        <span><LiveClock mode="uptime" :base-seconds="serverUptimeBase" :last-ping-at="lastPingTime" /></span>
       </div>
       <div class="mt-1 flex flex-col gap-0.5 text-xs text-gray-400 font-mono">
         <div class="flex items-center justify-between">
-          <span>{{ formattedTime }}</span>
+          <span><LiveClock mode="time" /></span>
           <!-- 主题调色盘按钮 -->
           <button
             class="flex items-center gap-1 rounded px-2 py-1 text-gray-400 transition-colors hover:bg-gray-200/50 hover:text-gray-600 dark:hover:bg-gray-700/50 dark:hover:text-gray-300"

@@ -1,18 +1,23 @@
 <script setup lang="ts">
+const model = defineModel<boolean>()
 defineProps<{
   label?: string
+  disabled?: boolean
 }>()
-const model = defineModel<boolean>()
 </script>
 
 <template>
-  <label class="inline-flex cursor-pointer items-center gap-3">
-    <div class="relative inline-flex items-center">
-      <input v-model="model" type="checkbox" class="peer sr-only">
-      <div class="h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:border after:border-gray-300 dark:border-gray-600 after:rounded-full after:bg-white dark:bg-gray-700 peer-checked:bg-green-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-green-500/20 after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white" />
-    </div>
-    <span v-if="label" class="select-none text-sm text-gray-700 font-medium dark:text-gray-300">
-      {{ label }}
+  <label class="inline-flex items-center gap-2 select-none" :class="disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
+    <span class="relative inline-flex h-6 w-11 items-center">
+      <input
+        v-model="model"
+        type="checkbox"
+        class="peer sr-only"
+        :disabled="disabled"
+      >
+      <span class="absolute inset-0 rounded-full border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] transition-all duration-200 peer-checked:border-[var(--theme-primary)] peer-checked:bg-[var(--theme-primary)] peer-focus-visible:shadow-[var(--shadow-glow)]" />
+      <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-5" />
     </span>
+    <span v-if="label" class="text-sm text-[var(--color-text-secondary)]">{{ label }}</span>
   </label>
 </template>

@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "lint": "eslint \"src/**/*.{ts,vue}\" --fix",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@vueuse/core": "^14.2.1",
@@ -23,6 +25,7 @@
     "@iconify-json/carbon": "^1.2.18",
     "@iconify-json/fa-solid": "^1.2.2",
     "@iconify-json/svg-spinners": "^1.2.4",
+    "@playwright/test": "1.61.1",
     "@types/node": "^24.10.1",
     "@types/nprogress": "^0.2.3",
     "@unocss/eslint-plugin": "^66.5.12",

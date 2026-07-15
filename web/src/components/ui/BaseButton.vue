@@ -25,38 +25,36 @@ const componentTag = computed(() => {
   return 'button'
 })
 
-const baseClasses = 'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
+const baseClasses = 'ds-btn-base focus-visible:shadow-[var(--shadow-glow)] active:scale-[0.98]'
 
 const variantClasses = computed(() => {
   switch (props.variant) {
-    case 'primary':
-      return 'text-white shadow-sm focus:ring-blue-500'
     case 'secondary':
-      return 'bg-gray-100 text-gray-700 hover:bg-gray-200 focus:ring-gray-500 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+      return 'bg-[var(--color-bg-subtle)] text-[var(--color-text-primary)] border border-[var(--color-border-default)] hover:bg-[color-mix(in_srgb,var(--theme-primary)_8%,var(--color-bg-subtle))]'
     case 'success':
-      return 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 shadow-sm dark:bg-green-600 dark:hover:bg-green-500'
+      return 'bg-[var(--color-success)] text-white shadow-sm hover:brightness-110'
     case 'danger':
-      return 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-sm dark:bg-red-600 dark:hover:bg-red-500'
+      return 'bg-[var(--color-danger)] text-white shadow-sm hover:brightness-110'
     case 'ghost':
-      return 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+      return 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-subtle)] hover:text-[var(--color-text-primary)]'
     case 'outline':
-      return 'border border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 focus:ring-gray-500 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800'
+      return 'border border-[var(--color-border-default)] bg-transparent text-[var(--color-text-primary)] hover:border-[var(--theme-primary)] hover:text-[var(--theme-primary)]'
     case 'text':
-      return 'hover:underline p-0 bg-transparent shadow-none hover:bg-transparent'
+      return 'p-0 bg-transparent shadow-none text-[var(--theme-primary)] hover:opacity-80'
+    case 'primary':
     default:
-      return 'text-white shadow-sm focus:ring-blue-500'
+      return 'text-white shadow-sm border border-transparent hover:brightness-110 hover:shadow-[var(--shadow-md)]'
   }
 })
 
 const sizeClasses = computed(() => {
   if (props.variant === 'text')
     return ''
-
   switch (props.size) {
     case 'sm':
       return 'px-3 py-1.5 text-sm'
     case 'lg':
-      return 'px-6 py-3 text-lg'
+      return 'px-6 py-3 text-base'
     default:
       return 'px-4 py-2 text-sm'
   }
@@ -65,8 +63,11 @@ const sizeClasses = computed(() => {
 const widthClasses = computed(() => props.block ? 'w-full' : '')
 
 const buttonStyle = computed(() => {
-  if (props.variant === 'primary' || (!props.variant && props.variant !== 'secondary' && props.variant !== 'danger' && props.variant !== 'success' && props.variant !== 'ghost' && props.variant !== 'outline' && props.variant !== 'text')) {
-    return { backgroundColor: 'var(--theme-primary)' }
+  if (!props.variant || props.variant === 'primary') {
+    return {
+      backgroundImage: 'var(--theme-gradient)',
+      backgroundColor: 'var(--theme-primary)',
+    }
   }
   if (props.variant === 'text') {
     return { color: 'var(--theme-primary)' }
@@ -87,7 +88,7 @@ const buttonStyle = computed(() => {
     v-bind="$attrs"
     @click="!disabled && !loading && emit('click', $event)"
   >
-    <div v-if="loading" class="i-svg-spinners-ring-resize mr-2 animate-spin" />
+    <div v-if="loading" class="i-svg-spinners-ring-resize animate-spin" />
     <slot />
   </component>
 </template>
