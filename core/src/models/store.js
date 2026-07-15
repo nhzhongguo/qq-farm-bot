@@ -1057,13 +1057,62 @@ function deleteUserOfflineReminder(username) {
 // ============ 账号管理 ============
 function loadAccounts() {
     ensureDataDir();
-    const data = readJsonFile(ACCOUNTS_FILE, () => ({ accounts: [], nextId: 1 }));
-    return normalizeAccountsData(data);
+    const backupPath = `${ACCOUNTS_FILE}.bak`;
+
+    if (fs.existsSync(ACCOUNTS_FILE)) {
+        try {
+            const mainRaw = fs.readFileSync(ACCOUNTS_FILE, 'utf8');
+            const data = JSON.parse(mainRaw);
+            if (!fs.existsSync(backupPath)) {
+                writeJsonFileAtomic(backupPath, data);
+            }
+            return normalizeAccountsData(data);
+        } catch (mainError) {
+            if (fs.existsSync(backupPath)) {
+                try {
+                    const backupRaw = fs.readFileSync(backupPath, 'utf8');
+                    const recovered = JSON.parse(backupRaw);
+                    writeJsonFileAtomic(ACCOUNTS_FILE, recovered);
+                    console.warn(`[数据恢复] 已从备份恢复: ${ACCOUNTS_FILE}`);
+                    return normalizeAccountsData(recovered);
+                } catch (backupError) {
+                    console.error('账号数据及备份均损坏:', backupError.message);
+                }
+            } else {
+                console.error('账号数据损坏且没有可用备份:', mainError.message);
+            }
+        }
+    } else if (fs.existsSync(backupPath)) {
+        try {
+            const backupRaw = fs.readFileSync(backupPath, 'utf8');
+            const recovered = JSON.parse(backupRaw);
+            writeJsonFileAtomic(ACCOUNTS_FILE, recovered);
+            console.warn(`[数据恢复] 主文件缺失，已从备份恢复: ${ACCOUNTS_FILE}`);
+            return normalizeAccountsData(recovered);
+        } catch (backupError) {
+            console.error('账号备份损坏:', backupError.message);
+        }
+    }
+
+    return normalizeAccountsData({ accounts: [], nextId: 1 });
 }
 
 function saveAccounts(data) {
     ensureDataDir();
-    writeJsonFileAtomic(ACCOUNTS_FILE, normalizeAccountsData(data));
+    const backupPath = `${ACCOUNTS_FILE}.bak`;
+    const normalized = normalizeAccountsData(data);
+    if (fs.existsSync(ACCOUNTS_FILE)) {
+        try {
+            const currentRaw = fs.readFileSync(ACCOUNTS_FILE, 'utf8');
+            const currentData = JSON.parse(currentRaw);
+            writeJsonFileAtomic(backupPath, currentData);
+        } catch (e) {
+            // If the main file is already corrupted, keep existing backup untouched.
+            console.warn('账号数据备份跳过（主文件不可用）:', e.message);
+        }
+    }
+    writeJsonFileAtomic(ACCOUNTS_FILE, normalized);
+    writeJsonFileAtomic(backupPath, normalized);
 }
 
 function getAccounts() {

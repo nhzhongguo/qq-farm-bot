@@ -242,6 +242,26 @@ function passwordHashMiddleware(req, res, next) {
 }
 
 const rateLimitStore = new Map();
+let rateLimitCleanupTimer = null;
+
+function ensureRateLimitCleanup() {
+    if (rateLimitCleanupTimer) return;
+    rateLimitCleanupTimer = setInterval(() => {
+        const now = Date.now();
+        for (const [key, record] of rateLimitStore.entries()) {
+            if (now > record.resetAt) {
+                rateLimitStore.delete(key);
+            }
+        }
+    }, 60000);
+    if (typeof rateLimitCleanupTimer.unref === 'function') {
+        rateLimitCleanupTimer.unref();
+    }
+}
+
+function resetRateLimitStore() {
+    rateLimitStore.clear();
+}
 
 function rateLimitMiddleware(options = {}) {
     const {
@@ -250,24 +270,26 @@ function rateLimitMiddleware(options = {}) {
         keyGenerator = (req) => getClientIp(req),
     } = options;
 
+    ensureRateLimitCleanup();
+
     return (req, res, next) => {
-        const key = keyGenerator(req);
+        const key = `${options.name || 'default'}:${keyGenerator(req)}`;
         const now = Date.now();
-        
+
         const record = rateLimitStore.get(key) || { count: 0, resetAt: now + windowMs };
-        
+
         if (now > record.resetAt) {
             record.count = 0;
             record.resetAt = now + windowMs;
         }
-        
+
         record.count += 1;
         rateLimitStore.set(key, record);
-        
+
         res.set('X-RateLimit-Limit', maxRequests);
         res.set('X-RateLimit-Remaining', Math.max(0, maxRequests - record.count));
         res.set('X-RateLimit-Reset', new Date(record.resetAt).toISOString());
-        
+
         if (record.count > maxRequests) {
             return res.status(429).json({
                 ok: false,
@@ -275,19 +297,10 @@ function rateLimitMiddleware(options = {}) {
                 retryAfter: Math.ceil((record.resetAt - now) / 1000)
             });
         }
-        
+
         next();
     };
 }
-
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, record] of rateLimitStore.entries()) {
-        if (now > record.resetAt) {
-            rateLimitStore.delete(key);
-        }
-    }
-}, 60000);
 
 module.exports = {
     hashPassword,
@@ -300,6 +313,7 @@ module.exports = {
     verifySessionToken,
     passwordHashMiddleware,
     rateLimitMiddleware,
+    resetRateLimitStore,
     SECURITY_CONFIG,
     getClientIp,
 };

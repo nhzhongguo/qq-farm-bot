@@ -66,13 +66,21 @@ function readJsonWithBackup(filePath, fallback) {
 
 function writeJsonWithBackup(filePath, data) {
     ensureDataDir();
+    const backupPath = `${filePath}.bak`;
+    // 1) Snapshot the previous good main file first (helps if process dies mid-write).
+    // 2) After the new main is written, refresh .bak to the latest good content
+    //    so later main-file corruption can still recover the newest state.
     if (fs.existsSync(filePath)) {
-        const currentRaw = fs.readFileSync(filePath, 'utf8');
-        JSON.parse(currentRaw);
-        writeTextFileAtomic(`${filePath}.bak`, currentRaw);
+        try {
+            const currentRaw = fs.readFileSync(filePath, 'utf8');
+            JSON.parse(currentRaw);
+            writeTextFileAtomic(backupPath, currentRaw);
+        } catch {
+            // Main file is unreadable; keep any existing backup untouched.
+        }
     }
     writeJsonFileAtomic(filePath, data);
-    writeJsonFileAtomic(`${filePath}.bak`, data);
+    writeJsonFileAtomic(backupPath, data);
 }
 
 let loginAttempts = {};
@@ -297,14 +305,26 @@ function hashPassword(password, salt = null) {
     return `${salt}:${hash}`;
 }
 
+function safeEqualHex(a, b) {
+    const left = Buffer.from(String(a || ''), 'utf8');
+    const right = Buffer.from(String(b || ''), 'utf8');
+    if (left.length !== right.length) {
+        // Keep comparison work roughly constant-time for mismatched lengths.
+        const dummy = Buffer.alloc(left.length || 1);
+        crypto.timingSafeEqual(dummy, dummy);
+        return false;
+    }
+    return crypto.timingSafeEqual(left, right);
+}
+
 function verifyPassword(password, storedPassword) {
     if (storedPassword.includes(':')) {
         const [salt, hash] = storedPassword.split(':');
         const newHash = crypto.pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, DIGEST).toString('hex');
-        return hash === newHash;
+        return safeEqualHex(hash, newHash);
     } else {
         const legacyHash = crypto.createHash('sha256').update(password).digest('hex');
-        return storedPassword === legacyHash;
+        return safeEqualHex(storedPassword, legacyHash);
     }
 }
 
@@ -917,7 +937,8 @@ function claimCardByUA(identity, username = null) {
     }
     
     const unusedTimeCards = cards.filter(c => 
-        c.type === 'time' && 
+        // Legacy cards may omit type; treat missing type as time cards.
+        (c.type === 'time' || !c.type) &&
         !c.usedBy && 
         !c.claimedAt &&
         c.enabled

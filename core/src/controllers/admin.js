@@ -8,7 +8,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const process = require('node:process');
 const express = require('express');
-const fetch = require('node-fetch');
 const { Server: SocketIOServer } = require('socket.io');
 const { version } = require('../../package.json');
 const { CONFIG, updateRuntimeConfig, getRuntimeConfig, getDefaultSystemConfig } = require('../config/config');
@@ -21,6 +20,7 @@ const { createModuleLogger } = require('../services/logger');
 const { MiniProgramLoginSession } = require('../services/qrlogin');
 const { getSchedulerRegistrySnapshot } = require('../services/scheduler');
 const userStore = require('../models/user-store');
+const { rateLimitMiddleware, resetRateLimitStore } = require('../services/security');
 
 const adminLogger = createModuleLogger('admin');
 
@@ -28,6 +28,7 @@ let app = null;
 let server = null;
 let provider = null; // DataProvider
 let io = null;
+let runtimeTimers = [];
 
 function emitRealtimeStatus(accountId, status) {
     if (!io) return;
@@ -67,9 +68,24 @@ function startAdminServer(dataProvider) {
     provider = dataProvider;
 
     app = express();
+    app.disable('x-powered-by');
     const trustProxyEnv = String(process.env.TRUST_PROXY || '').trim().toLowerCase();
     app.set('trust proxy', trustProxyEnv === '1' || trustProxyEnv === 'true' ? 1 : false);
-    app.use(express.json());
+    app.use(express.json({ limit: '1mb' }));
+
+    // Baseline HTTP security headers (helmet-lite, no extra dependency)
+    app.use((req, res, next) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+        res.setHeader('Referrer-Policy', 'no-referrer');
+        res.setHeader('X-XSS-Protection', '0');
+        res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+        if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+            res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
+        next();
+    });
 
     function getClientIp(req) {
         if (req.ip) {
@@ -232,10 +248,27 @@ function startAdminServer(dataProvider) {
     };
 
     // 启动定期清理
-    setInterval(cleanupExpiredUsers, 5 * 60 * 1000); // 每5分钟检查一次
+    runtimeTimers.push(setInterval(cleanupExpiredUsers, 5 * 60 * 1000)); // 每5分钟检查一次
+
+    // Public write endpoints: HTTP rate limits (IP based)
+    const loginRateLimit = rateLimitMiddleware({
+        name: 'login',
+        windowMs: 60 * 1000,
+        maxRequests: 20,
+    });
+    const registerRateLimit = rateLimitMiddleware({
+        name: 'register',
+        windowMs: 60 * 1000,
+        maxRequests: 10,
+    });
+    const cardClaimRateLimit = rateLimitMiddleware({
+        name: 'card-claim',
+        windowMs: 60 * 1000,
+        maxRequests: 10,
+    });
 
     // 登录与鉴权
-    app.post('/api/login', (req, res) => {
+    app.post('/api/login', loginRateLimit, (req, res) => {
         const { username, password } = req.body || {};
         const clientIp = getClientIp(req);
         const userAgent = req.headers['user-agent'] || 'unknown';
@@ -332,7 +365,7 @@ function startAdminServer(dataProvider) {
     });
 
     // 注册接口
-    app.post('/api/register', (req, res) => {
+    app.post('/api/register', registerRateLimit, (req, res) => {
         const { username, password, cardCode } = req.body || {};
         if (!username || !password || !cardCode) {
             return res.status(400).json({ ok: false, error: '请填写完整信息' });
@@ -456,8 +489,19 @@ function startAdminServer(dataProvider) {
         res.json(result);
     });
 
+    // Global API auth: public allowlist only; everything else requires token
     app.use('/api', (req, res, next) => {
-        if (req.path === '/login' || req.path === '/card-claim/status' || req.path === '/card-claim/claim' || req.path === '/game-version') return next();
+        const publicExactPaths = new Set([
+            '/login',
+            '/register',
+            '/card-claim/status',
+            '/card-claim/claim',
+            '/game-version',
+            '/ping',
+        ]);
+        if (publicExactPaths.has(req.path)) return next();
+        // card info preview for renew UI (path param)
+        if (req.method === 'GET' && /^\/card\/info\/[^/]+$/.test(req.path)) return next();
         return authRequired(req, res, next);
     });
 
@@ -1850,7 +1894,7 @@ function startAdminServer(dataProvider) {
     });
 
     // 用户领取卡密
-    app.post('/api/card-claim/claim', (req, res) => {
+    app.post('/api/card-claim/claim', cardClaimRateLimit, (req, res) => {
         try {
             const ua = req.headers['user-agent'] || '';
             const identity = `${getClientIp(req)}|${ua}`;
@@ -2618,8 +2662,29 @@ function startAdminServer(dataProvider) {
     });
 }
 
+function stopAdminServer() {
+    try { resetRateLimitStore(); } catch { /* ignore */ }
+    for (const timer of runtimeTimers) {
+        clearInterval(timer);
+    }
+    runtimeTimers = [];
+    if (io) {
+        try { io.close(); } catch { /* ignore */ }
+        io = null;
+    }
+    if (server) {
+        try { server.close(); } catch { /* ignore */ }
+        server = null;
+    }
+    app = null;
+    provider = null;
+}
+
 module.exports = {
     startAdminServer,
+    stopAdminServer,
+    // test helper
+    resetPublicRateLimits: resetRateLimitStore,
     emitRealtimeStatus,
     emitRealtimeLog,
     emitRealtimeAccountLog,
