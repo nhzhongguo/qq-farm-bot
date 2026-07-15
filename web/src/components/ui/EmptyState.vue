@@ -11,7 +11,7 @@ defineProps<{
     <div class="ds-empty-icon">
       <div :class="icon || 'i-carbon-cube'" />
     </div>
-    <div class="text-base font-semibold text-[var(--color-text-primary)]">
+    <div class="text-base text-[var(--color-text-primary)] font-semibold">
       {{ title }}
     </div>
     <p v-if="description" class="max-w-md text-sm text-[var(--color-text-secondary)]">

@@ -21,7 +21,7 @@ const tabs = [
       </template>
     </PageHeader>
 
-    <div class="flex gap-1 overflow-x-auto rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-1">
+    <div class="flex gap-1 overflow-x-auto border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-1">
       <button
         v-for="tab in tabs"
         :key="tab.key"

@@ -39,7 +39,7 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
 
 <template>
   <div ref="containerRef" class="flex flex-col gap-1.5">
-    <label v-if="label" class="text-sm font-medium text-[var(--color-text-secondary)]">
+    <label v-if="label" class="text-sm text-[var(--color-text-secondary)] font-medium">
       {{ label }}
     </label>
     <div class="relative">
@@ -66,7 +66,7 @@ onUnmounted(() => document.removeEventListener('click', closeDropdown))
       >
         <div
           v-if="isOpen"
-          class="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-auto rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-elevated)] py-1 shadow-[var(--shadow-md)]"
+          class="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-auto border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-elevated)] py-1 shadow-[var(--shadow-md)]"
         >
           <template v-if="options?.length">
             <button

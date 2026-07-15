@@ -39,18 +39,27 @@ const passwordStrength = computed(() => {
     return { score: 0, level: '', valid: false, color: 'var(--color-text-tertiary)' }
 
   let score = 0
-  if (pwd.length >= 6) score++
-  if (pwd.length >= 10) score++
+  if (pwd.length >= 6)
+    score++
+  if (pwd.length >= 10)
+    score++
 
   let typeCount = 0
-  if (/[a-z]/.test(pwd)) typeCount++
-  if (/[A-Z]/.test(pwd)) typeCount++
-  if (/\d/.test(pwd)) typeCount++
-  if (/[!@#$%^&*(),.?":{}|<>_\-+=[\]\\;'/`~]/.test(pwd)) typeCount++
+  if (/[a-z]/.test(pwd))
+    typeCount++
+  if (/[A-Z]/.test(pwd))
+    typeCount++
+  if (/\d/.test(pwd))
+    typeCount++
+  if (/[!@#$%^&*(),.?":{}|<>_\-+=[\]\\;'/`~]/.test(pwd))
+    typeCount++
 
-  if (typeCount >= 2) score += 2
-  if (typeCount >= 3) score++
-  if (typeCount >= 4) score++
+  if (typeCount >= 2)
+    score += 2
+  if (typeCount >= 3)
+    score++
+  if (typeCount >= 4)
+    score++
 
   const commonPasswords = ['password', '123456', 'qwerty', 'abc123', '111111']
   if (commonPasswords.some(p => pwd.toLowerCase().includes(p)))
@@ -64,10 +73,14 @@ const passwordStrength = computed(() => {
 
 const usernameValid = computed(() => {
   const name = username.value
-  if (!name) return { valid: false, message: '' }
-  if (name.length < 3) return { valid: false, message: '用户名至少3位' }
-  if (name.length > 32) return { valid: false, message: '用户名最多32位' }
-  if (!/^\w+$/.test(name)) return { valid: false, message: '只能包含字母、数字、下划线' }
+  if (!name)
+    return { valid: false, message: '' }
+  if (name.length < 3)
+    return { valid: false, message: '用户名至少3位' }
+  if (name.length > 32)
+    return { valid: false, message: '用户名最多32位' }
+  if (!/^\w+$/.test(name))
+    return { valid: false, message: '只能包含字母、数字、下划线' }
   return { valid: true, message: '' }
 })
 
@@ -77,22 +90,38 @@ watch(password, () => {
 })
 
 function validateForm(): boolean {
-  if (!username.value) { error.value = '请输入用户名'; return false }
-  if (!usernameValid.value.valid) { error.value = usernameValid.value.message; return false }
-  if (!password.value) { error.value = '请输入密码'; return false }
+  if (!username.value) {
+    error.value = '请输入用户名'
+    return false
+  }
+  if (!usernameValid.value.valid) {
+    error.value = usernameValid.value.message
+    return false
+  }
+  if (!password.value) {
+    error.value = '请输入密码'
+    return false
+  }
   if (!isLogin.value) {
-    if (password.value.length < 6) { error.value = '密码长度至少6位'; return false }
+    if (password.value.length < 6) {
+      error.value = '密码长度至少6位'
+      return false
+    }
     if (!passwordStrength.value.valid) {
       error.value = '密码强度不足：需包含大写字母、小写字母、数字、特殊符号中的至少两种'
       return false
     }
-    if (!cardCode.value) { error.value = '请输入卡密'; return false }
+    if (!cardCode.value) {
+      error.value = '请输入卡密'
+      return false
+    }
   }
   return true
 }
 
 async function handleSubmit() {
-  if (!validateForm()) return
+  if (!validateForm())
+    return
   loading.value = true
   error.value = ''
   success.value = ''
@@ -110,11 +139,13 @@ async function handleSubmit() {
       }
       else if (result.errorType === 'rate_limit') {
         error.value = result.error || '请求过于频繁，请稍后重试'
-        if (result.remainingMs) rateLimitRemaining.value = Math.ceil(result.remainingMs / 1000)
+        if (result.remainingMs)
+          rateLimitRemaining.value = Math.ceil(result.remainingMs / 1000)
       }
       else if (result.errorType === 'locked') {
         error.value = result.error || '账户已被锁定'
-        if (result.remainingMs) lockoutRemaining.value = Math.ceil(result.remainingMs / 1000 / 60)
+        if (result.remainingMs)
+          lockoutRemaining.value = Math.ceil(result.remainingMs / 1000 / 60)
       }
       else {
         error.value = result.error || '登录失败'
@@ -137,11 +168,13 @@ async function handleSubmit() {
     const data = e.response?.data
     if (data?.errorType === 'rate_limit') {
       error.value = data.error || '请求过于频繁'
-      if (data.remainingMs) rateLimitRemaining.value = Math.ceil(data.remainingMs / 1000)
+      if (data.remainingMs)
+        rateLimitRemaining.value = Math.ceil(data.remainingMs / 1000)
     }
     else if (data?.errorType === 'locked') {
       error.value = data.error || '账户已被锁定'
-      if (data.remainingMs) lockoutRemaining.value = Math.ceil(data.remainingMs / 1000 / 60)
+      if (data.remainingMs)
+        lockoutRemaining.value = Math.ceil(data.remainingMs / 1000 / 60)
     }
     else {
       error.value = data?.error || e.message || '操作异常'
@@ -173,7 +206,8 @@ async function checkCardClaimStatus() {
 }
 
 async function claimFreeCard() {
-  if (cardClaimLoading.value) return
+  if (cardClaimLoading.value)
+    return
   cardClaimLoading.value = true
   error.value = ''
   try {
@@ -235,6 +269,7 @@ onMounted(() => {
   fetchGameVersion()
 })
 </script>
+
 <template>
   <div class="login-shell ds-app-bg relative min-h-screen w-screen overflow-auto">
     <div class="pointer-events-none absolute inset-0">
@@ -243,40 +278,54 @@ onMounted(() => {
       <div class="grid-mask" />
     </div>
 
-    <div class="relative z-10 mx-auto grid min-h-screen max-w-6xl items-center gap-8 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
+    <div class="relative z-10 grid mx-auto max-w-6xl min-h-screen items-center gap-8 px-4 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
       <section class="hidden lg:block">
         <div class="ds-chip ds-chip-brand mb-5">
           <div class="i-carbon-sprout" />
           QQ农场智能助手
         </div>
-        <h1 class="max-w-xl text-4xl font-bold tracking-tight text-[var(--color-text-primary)] xl:text-5xl">
+        <h1 class="max-w-xl text-4xl text-[var(--color-text-primary)] font-bold tracking-tight xl:text-5xl">
           多账号自动化运营台
           <span class="block bg-clip-text text-transparent" style="background-image: var(--theme-gradient)">更稳、更清晰、更高级</span>
         </h1>
-        <p class="mt-4 max-w-lg text-base leading-relaxed text-[var(--color-text-secondary)]">
+        <p class="mt-4 max-w-lg text-base text-[var(--color-text-secondary)] leading-relaxed">
           统一管理农场账号、实时状态、策略自动化与后台发卡。登录后即可进入商业级控制面板。
         </p>
-        <div class="mt-8 grid max-w-lg grid-cols-3 gap-3">
+        <div class="grid grid-cols-3 mt-8 max-w-lg gap-3">
           <div class="ds-card p-4">
-            <div class="text-xs text-[var(--color-text-tertiary)]">实时状态</div>
-            <div class="mt-1 text-lg font-semibold">Socket 同步</div>
+            <div class="text-xs text-[var(--color-text-tertiary)]">
+              实时状态
+            </div>
+            <div class="mt-1 text-lg font-semibold">
+              Socket 同步
+            </div>
           </div>
           <div class="ds-card p-4">
-            <div class="text-xs text-[var(--color-text-tertiary)]">安全边界</div>
-            <div class="mt-1 text-lg font-semibold">限流鉴权</div>
+            <div class="text-xs text-[var(--color-text-tertiary)]">
+              安全边界
+            </div>
+            <div class="mt-1 text-lg font-semibold">
+              限流鉴权
+            </div>
           </div>
           <div class="ds-card p-4">
-            <div class="text-xs text-[var(--color-text-tertiary)]">运营效率</div>
-            <div class="mt-1 text-lg font-semibold">多账号</div>
+            <div class="text-xs text-[var(--color-text-tertiary)]">
+              运营效率
+            </div>
+            <div class="mt-1 text-lg font-semibold">
+              多账号
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="mx-auto w-full max-w-md">
+      <section class="mx-auto max-w-md w-full">
         <form class="ds-surface p-6 sm:p-8" @submit.prevent="handleSubmit">
           <div class="mb-6 flex items-center justify-between gap-3">
             <div>
-              <div class="text-sm text-[var(--color-text-tertiary)]">欢迎回来</div>
+              <div class="text-sm text-[var(--color-text-tertiary)]">
+                欢迎回来
+              </div>
               <h2 class="mt-1 text-2xl font-bold tracking-tight">
                 {{ isLogin ? '登录控制台' : '注册新账户' }}
               </h2>
@@ -286,7 +335,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="mb-5 grid grid-cols-2 gap-1 rounded-xl bg-[var(--color-bg-subtle)] p-1">
+          <div class="grid grid-cols-2 mb-5 gap-1 rounded-xl bg-[var(--color-bg-subtle)] p-1">
             <button
               type="button"
               class="rounded-lg px-3 py-2 text-sm font-semibold transition"
@@ -309,7 +358,7 @@ onMounted(() => {
             <BaseInput v-model="username" label="用户名" placeholder="请输入用户名" />
             <BaseInput v-model="password" type="password" label="密码" placeholder="请输入密码" />
 
-            <div v-if="!isLogin && showPasswordStrength" class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
+            <div v-if="!isLogin && showPasswordStrength" class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
               <div class="mb-2 flex items-center justify-between text-xs">
                 <span class="text-[var(--color-text-secondary)]">密码强度</span>
                 <span class="font-semibold" :style="{ color: passwordStrength.color }">{{ passwordStrength.level || '—' }}</span>
@@ -336,7 +385,7 @@ onMounted(() => {
 
           <div
             v-if="error"
-            class="mt-4 rounded-xl border px-3 py-2 text-sm"
+            class="mt-4 border rounded-xl px-3 py-2 text-sm"
             style="border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); background: var(--color-danger-soft); color: var(--color-danger)"
           >
             {{ error }}
@@ -345,7 +394,7 @@ onMounted(() => {
           </div>
           <div
             v-if="success"
-            class="mt-4 rounded-xl border px-3 py-2 text-sm"
+            class="mt-4 border rounded-xl px-3 py-2 text-sm"
             style="border-color: color-mix(in srgb, var(--color-success) 30%, transparent); background: var(--color-success-soft); color: var(--color-success)"
           >
             {{ success }}
@@ -364,14 +413,14 @@ onMounted(() => {
     </div>
 
     <div v-if="showClaimModal" class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm" @click="closeClaimModal">
-      <div class="ds-surface-solid w-full max-w-sm p-6" @click.stop>
+      <div class="ds-surface-solid max-w-sm w-full p-6" @click.stop>
         <div class="mb-3 text-lg font-bold" :class="claimModalContent.success ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'">
           {{ claimModalContent.title }}
         </div>
         <p class="text-sm text-[var(--color-text-secondary)]">
           {{ claimModalContent.message }}
         </p>
-        <div v-if="claimModalContent.cardCode" class="mt-4 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] px-3 py-2 font-mono text-sm">
+        <div v-if="claimModalContent.cardCode" class="mt-4 border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] px-3 py-2 text-sm font-mono">
           {{ claimModalContent.cardCode }}
         </div>
         <BaseButton class="mt-5" block @click="closeClaimModal">
@@ -386,8 +435,7 @@ onMounted(() => {
 .login-shell {
   background:
     radial-gradient(1000px 520px at 10% -10%, rgba(var(--theme-primary-rgb), 0.18), transparent 55%),
-    radial-gradient(800px 480px at 90% 10%, rgba(var(--theme-primary-rgb), 0.12), transparent 50%),
-    var(--color-bg-app);
+    radial-gradient(800px 480px at 90% 10%, rgba(var(--theme-primary-rgb), 0.12), transparent 50%), var(--color-bg-app);
 }
 .orb {
   position: absolute;
@@ -420,6 +468,9 @@ onMounted(() => {
   opacity: 0.45;
 }
 @media (prefers-reduced-motion: reduce) {
-  .orb { filter: none; opacity: 0.25; }
+  .orb {
+    filter: none;
+    opacity: 0.25;
+  }
 }
 </style>

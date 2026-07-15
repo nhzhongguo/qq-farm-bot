@@ -13,7 +13,7 @@ const inputId = useId()
 
 <template>
   <div class="flex flex-col gap-1.5">
-    <label v-if="label" :for="inputId" class="text-sm font-medium text-[var(--color-text-secondary)]">
+    <label v-if="label" :for="inputId" class="text-sm text-[var(--color-text-secondary)] font-medium">
       {{ label }}
     </label>
     <textarea
@@ -22,7 +22,7 @@ const inputId = useId()
       :placeholder="placeholder"
       :disabled="disabled"
       :rows="rows || 3"
-      class="ds-input-base resize-y min-h-20"
+      class="ds-input-base min-h-20 resize-y"
     />
   </div>
 </template>

@@ -1,3 +1,4 @@
+import type { ThemeId } from '@/composables/theme'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import api from '@/api'
@@ -7,7 +8,7 @@ import {
   resolveThemeId,
   THEME_CATALOG,
   THEME_KEY,
-  type ThemeId,
+
 } from '@/composables/theme'
 
 export type Theme = ThemeId

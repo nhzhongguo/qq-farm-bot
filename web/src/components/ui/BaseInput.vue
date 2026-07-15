@@ -23,7 +23,7 @@ const inputType = computed(() => {
 
 <template>
   <div class="flex flex-col gap-1.5">
-    <label v-if="label" :for="inputId" class="text-sm font-medium text-[var(--color-text-secondary)]">
+    <label v-if="label" :for="inputId" class="text-sm text-[var(--color-text-secondary)] font-medium">
       {{ label }}
     </label>
     <div class="relative">
@@ -39,7 +39,7 @@ const inputType = computed(() => {
       <button
         v-if="type === 'password'"
         type="button"
-        class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
+        class="absolute right-3 top-1/2 text-[var(--color-text-tertiary)] -translate-y-1/2 hover:text-[var(--color-text-primary)]"
         :aria-label="showPassword ? '隐藏密码' : '显示密码'"
         @click="showPassword = !showPassword"
       >
@@ -49,7 +49,7 @@ const inputType = computed(() => {
       <button
         v-else-if="clearable && model"
         type="button"
-        class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
+        class="absolute right-3 top-1/2 text-[var(--color-text-tertiary)] -translate-y-1/2 hover:text-[var(--color-text-primary)]"
         aria-label="清除"
         @click="model = ''; emit('clear')"
       >

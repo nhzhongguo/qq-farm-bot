@@ -1,12 +1,12 @@
-export type ThemeId =
-  | 'light-blue'
-  | 'light-green'
-  | 'light-pink'
-  | 'dark-blue'
-  | 'dark-purple'
-  | 'dark-teal'
-  | 'dark-orange'
-  | 'dark-red'
+export type ThemeId
+  = | 'light-blue'
+    | 'light-green'
+    | 'light-pink'
+    | 'dark-blue'
+    | 'dark-purple'
+    | 'dark-teal'
+    | 'dark-orange'
+    | 'dark-red'
 
 export interface ThemeDefinition {
   name: string

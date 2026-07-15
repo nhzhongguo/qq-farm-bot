@@ -5,10 +5,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import LandCard from '@/components/LandCard.vue'
-import PageHeader from '@/components/ui/PageHeader.vue'
-import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import BaseInput from '@/components/ui/BaseInput.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
 import { useFriendStore } from '@/stores/friend'
 import { useStatusStore } from '@/stores/status'
@@ -624,7 +624,7 @@ async function handleBatchAddKnownFriendGids() {
       </template>
     </PageHeader>
 
-    <div class="flex gap-1 overflow-x-auto rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-1">
+    <div class="flex gap-1 overflow-x-auto border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-1">
       <button
         v-for="tab in TABS"
         :key="tab.key"
@@ -675,11 +675,11 @@ async function handleBatchAddKnownFriendGids() {
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <div class="i-carbon-user-profile text-lg text-[var(--color-warning)]" />
-                <h3 class="text-base font-semibold text-[var(--color-text-primary)] sm:text-lg">
+                <h3 class="text-base text-[var(--color-text-primary)] font-semibold sm:text-lg">
                   QQ 好友自动同步
                 </h3>
                 <button
-                  class="cursor-pointer rounded-full bg-[var(--color-warning-soft)] px-2 py-0.5 text-xs font-medium text-[var(--color-warning)] transition hover:opacity-90"
+                  class="cursor-pointer rounded-full bg-[var(--color-warning-soft)] px-2 py-0.5 text-xs text-[var(--color-warning)] font-medium transition hover:opacity-90"
                   @click="openGidListModal"
                 >
                   {{ knownFriendGidCount }} 个 GID
@@ -716,7 +716,7 @@ async function handleBatchAddKnownFriendGids() {
             </div>
           </div>
 
-          <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
+          <div class="grid mt-4 gap-3 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
             <BaseInput
               v-model="newKnownFriendGid"
               type="number"
@@ -820,7 +820,7 @@ async function handleBatchAddKnownFriendGids() {
                 </div>
                 <div class="min-w-0 flex-1">
                   <div class="mb-1 flex flex-wrap items-center gap-2">
-                    <span class="max-w-full truncate text-base font-semibold text-[var(--color-text-primary)]">
+                    <span class="max-w-full truncate text-base text-[var(--color-text-primary)] font-semibold">
                       {{ friend.name || `GID:${friend.gid}` }}
                     </span>
                     <span v-if="getFriendLevel(friend)" class="ds-chip ds-chip-brand">
@@ -847,50 +847,50 @@ async function handleBatchAddKnownFriendGids() {
               <div class="border-t border-[var(--color-border-default)] bg-[var(--color-bg-subtle)]/60 p-3">
                 <div class="flex flex-wrap gap-2">
                   <button
-                    class="rounded-lg bg-[var(--color-success-soft)] px-3 py-2 text-sm font-medium text-[var(--color-success)] transition hover:opacity-90"
+                    class="rounded-lg bg-[var(--color-success-soft)] px-3 py-2 text-sm text-[var(--color-success)] font-medium transition hover:opacity-90"
                     @click="handleOp(friend.gid, 'help', $event)"
                   >
                     帮助
                   </button>
                   <button
-                    class="rounded-lg bg-[var(--color-info-soft)] px-3 py-2 text-sm font-medium text-[var(--color-info)] transition hover:opacity-90"
+                    class="rounded-lg bg-[var(--color-info-soft)] px-3 py-2 text-sm text-[var(--color-info)] font-medium transition hover:opacity-90"
                     @click="handleOp(friend.gid, 'steal', $event)"
                   >
                     偷取
                   </button>
                   <button
-                    class="rounded-lg bg-[var(--color-success-soft)] px-3 py-2 text-sm font-medium text-[var(--color-success)] transition hover:opacity-90"
+                    class="rounded-lg bg-[var(--color-success-soft)] px-3 py-2 text-sm text-[var(--color-success)] font-medium transition hover:opacity-90"
                     @click="handleOp(friend.gid, 'water', $event)"
                   >
                     浇水
                   </button>
                   <button
-                    class="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2 text-sm font-medium text-[var(--color-warning)] transition hover:opacity-90"
+                    class="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2 text-sm text-[var(--color-warning)] font-medium transition hover:opacity-90"
                     @click="handleOp(friend.gid, 'weed', $event)"
                   >
                     除草
                   </button>
                   <button
-                    class="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2 text-sm font-medium text-[var(--color-warning)] transition hover:opacity-90"
+                    class="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2 text-sm text-[var(--color-warning)] font-medium transition hover:opacity-90"
                     @click="handleOp(friend.gid, 'bug', $event)"
                   >
                     除虫
                   </button>
                   <button
-                    class="rounded-lg bg-[var(--color-danger-soft)] px-3 py-2 text-sm font-medium text-[var(--color-danger)] transition hover:opacity-90"
+                    class="rounded-lg bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-danger)] font-medium transition hover:opacity-90"
                     @click="handleOp(friend.gid, 'bad', $event)"
                   >
                     捣乱
                   </button>
                   <button
-                    class="rounded-lg bg-[var(--color-bg-subtle)] px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] transition hover:opacity-90"
+                    class="rounded-lg bg-[var(--color-bg-subtle)] px-3 py-2 text-sm text-[var(--color-text-secondary)] font-medium transition hover:opacity-90"
                     @click="handleToggleBlacklist(friend, $event)"
                   >
                     {{ blacklistGidSet.has(Number(friend.gid)) ? '移出黑名单' : '加入黑名单' }}
                   </button>
                   <button
                     v-if="isQqAccount && knownFriendGidSet.has(Number(friend.gid))"
-                    class="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2 text-sm font-medium text-[var(--color-warning)] transition hover:opacity-90"
+                    class="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2 text-sm text-[var(--color-warning)] font-medium transition hover:opacity-90"
                     @click="handleRemoveKnownFriendGid(friend, $event)"
                   >
                     移出同步列表
@@ -905,7 +905,7 @@ async function handleBatchAddKnownFriendGids() {
                 <div v-else-if="!friendLands[friend.gid] || friendLands[friend.gid]?.length === 0" class="py-4 text-center text-sm text-[var(--color-text-secondary)]">
                   无土地数据
                 </div>
-                <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8">
+                <div v-else class="grid grid-cols-2 gap-2 lg:grid-cols-8 md:grid-cols-5 sm:grid-cols-4">
                   <LandCard
                     v-for="land in friendLands[friend.gid]"
                     :key="land.id"
@@ -972,7 +972,7 @@ async function handleBatchAddKnownFriendGids() {
             :key="item.gid"
             class="ds-card flex items-center justify-between gap-3 p-4"
           >
-            <div class="flex min-w-0 items-center gap-3">
+            <div class="min-w-0 flex items-center gap-3">
               <div class="h-10 w-10 flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-bg-subtle)] ring-1 ring-[var(--color-border-default)]">
                 <img
                   v-if="item.avatarUrl"
@@ -984,7 +984,7 @@ async function handleBatchAddKnownFriendGids() {
                 <div v-else class="i-carbon-user text-[var(--color-text-tertiary)]" />
               </div>
               <div class="min-w-0">
-                <div class="truncate font-medium text-[var(--color-text-primary)]">
+                <div class="truncate text-[var(--color-text-primary)] font-medium">
                   {{ item.name || `GID:${item.gid}` }}
                 </div>
                 <div class="text-sm text-[var(--color-text-tertiary)]">
@@ -1070,7 +1070,7 @@ async function handleBatchAddKnownFriendGids() {
             </div>
             <div class="min-w-0 flex-1">
               <div class="mb-1 flex flex-wrap items-center gap-2">
-                <span class="max-w-full truncate text-base font-medium text-[var(--color-text-primary)]">
+                <span class="max-w-full truncate text-base text-[var(--color-text-primary)] font-medium">
                   {{ record.nick || `GID:${record.visitorGid}` }}
                 </span>
                 <span
@@ -1118,7 +1118,7 @@ async function handleBatchAddKnownFriendGids() {
         @click.self="showBatchAddGidModal = false"
       >
         <div class="ds-surface-solid max-w-lg w-full p-6 shadow-lg">
-          <h3 class="mb-2 text-lg font-semibold text-[var(--color-text-primary)]">
+          <h3 class="mb-2 text-lg text-[var(--color-text-primary)] font-semibold">
             批量新增 GID
           </h3>
           <p class="mb-3 text-sm text-[var(--color-text-secondary)]">
@@ -1128,7 +1128,7 @@ async function handleBatchAddKnownFriendGids() {
             v-model="batchGidInput"
             rows="8"
             placeholder="每行一个 GID，或用逗号、空格分隔&#10;例如：&#10;12345678&#10;87654321&#10;或&#10;12345678, 87654321, 11111111"
-            class="ds-input-base mb-4 w-full resize-y p-3 font-mono text-sm"
+            class="mb-4 ds-input-base w-full resize-y p-3 text-sm font-mono"
           />
           <div class="flex justify-end gap-3">
             <BaseButton variant="secondary" @click="showBatchAddGidModal = false">
@@ -1154,7 +1154,7 @@ async function handleBatchAddKnownFriendGids() {
         <div class="ds-surface-solid max-h-[80vh] max-w-2xl w-full flex flex-col overflow-hidden shadow-lg">
           <div class="flex shrink-0 items-center justify-between border-b border-[var(--color-border-default)] p-4">
             <div>
-              <h3 class="text-lg font-semibold text-[var(--color-text-primary)]">
+              <h3 class="text-lg text-[var(--color-text-primary)] font-semibold">
                 已导入的 GID 列表
               </h3>
               <p class="mt-1 text-sm text-[var(--color-text-secondary)]">
@@ -1198,18 +1198,18 @@ async function handleBatchAddKnownFriendGids() {
               title="暂无数据"
               description="没有匹配的 GID"
             />
-            <div v-else class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div v-else class="grid gap-2 lg:grid-cols-3 sm:grid-cols-2">
               <div
                 v-for="item in filteredKnownFriendGids"
                 :key="item.gid"
-                class="flex items-center justify-between rounded-xl border p-2.5 transition"
+                class="flex items-center justify-between border rounded-xl p-2.5 transition"
                 :class="item.synced
                   ? 'border-[var(--color-warning)]/40 bg-[var(--color-warning-soft)]'
                   : 'border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)]'"
               >
                 <div class="flex items-center gap-2">
                   <span
-                    class="font-mono text-sm"
+                    class="text-sm font-mono"
                     :class="item.synced ? 'text-[var(--color-warning)]' : 'text-[var(--color-danger)]'"
                   >
                     {{ item.gid }}

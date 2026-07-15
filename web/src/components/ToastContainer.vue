@@ -6,15 +6,18 @@ const toastStore = useToastStore()
 const { toasts } = storeToRefs(toastStore)
 
 function iconOf(type: string) {
-  if (type === 'success') return 'i-carbon-checkmark-filled'
-  if (type === 'error') return 'i-carbon-error-filled'
-  if (type === 'warning') return 'i-carbon-warning-filled'
+  if (type === 'success')
+    return 'i-carbon-checkmark-filled'
+  if (type === 'error')
+    return 'i-carbon-error-filled'
+  if (type === 'warning')
+    return 'i-carbon-warning-filled'
   return 'i-carbon-information-filled'
 }
 </script>
 
 <template>
-  <div class="pointer-events-none fixed right-3 top-3 z-[var(--z-toast)] flex w-[min(22rem,calc(100vw-1.5rem))] flex-col gap-2 sm:right-4 sm:top-4">
+  <div class="pointer-events-none fixed right-3 top-3 z-[var(--z-toast)] w-[min(22rem,calc(100vw-1.5rem))] flex flex-col gap-2 sm:right-4 sm:top-4">
     <TransitionGroup
       enter-active-class="transition duration-200 ease-out"
       enter-from-class="opacity-0 translate-y-2"
@@ -26,7 +29,7 @@ function iconOf(type: string) {
       <div
         v-for="toast in toasts"
         :key="toast.id"
-        class="pointer-events-auto flex items-start gap-3 rounded-xl border px-4 py-3 shadow-[var(--shadow-md)] backdrop-blur-md"
+        class="pointer-events-auto flex items-start gap-3 border rounded-xl px-4 py-3 shadow-[var(--shadow-md)] backdrop-blur-md"
         :class="{
           'bg-[color-mix(in_srgb,var(--color-success-soft)_90%,var(--color-bg-surface))] border-[color-mix(in_srgb,var(--color-success)_30%,transparent)] text-[var(--color-success)]': toast.type === 'success',
           'bg-[color-mix(in_srgb,var(--color-danger-soft)_90%,var(--color-bg-surface))] border-[color-mix(in_srgb,var(--color-danger)_30%,transparent)] text-[var(--color-danger)]': toast.type === 'error',
@@ -35,7 +38,7 @@ function iconOf(type: string) {
         }"
       >
         <div :class="iconOf(toast.type)" class="mt-0.5 text-lg" />
-        <div class="min-w-0 flex-1 text-sm font-medium leading-relaxed text-[var(--color-text-primary)]">
+        <div class="min-w-0 flex-1 text-sm text-[var(--color-text-primary)] font-medium leading-relaxed">
           {{ toast.message }}
         </div>
         <button class="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]" aria-label="关闭通知" @click="toastStore.remove(toast.id)">

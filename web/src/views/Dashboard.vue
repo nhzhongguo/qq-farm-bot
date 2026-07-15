@@ -6,8 +6,8 @@ import api from '@/api'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
-import PageHeader from '@/components/ui/PageHeader.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import PageHeader from '@/components/ui/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
 import { useBagStore } from '@/stores/bag'
 import { useStatusStore } from '@/stores/status'
@@ -504,18 +504,30 @@ useIntervalFn(updateCountdowns, 1000)
             </div>
           </div>
 
-          <div class="grid min-w-0 flex-1 grid-cols-3 gap-2">
-            <div class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
-              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]"><div class="i-fas-coins text-yellow-500" />金币</div>
-              <div class="mt-2 text-lg font-bold text-yellow-600 dark:text-yellow-400">{{ status?.status?.gold || 0 }}</div>
+          <div class="grid grid-cols-3 min-w-0 flex-1 gap-2">
+            <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
+              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]">
+                <div class="i-fas-coins text-yellow-500" />金币
+              </div>
+              <div class="mt-2 text-lg text-yellow-600 font-bold dark:text-yellow-400">
+                {{ status?.status?.gold || 0 }}
+              </div>
             </div>
-            <div class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
-              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]"><div class="i-carbon-ticket text-sky-500" />点券</div>
-              <div class="mt-2 text-lg font-bold">{{ status?.status?.coupon || 0 }}</div>
+            <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
+              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]">
+                <div class="i-carbon-ticket text-sky-500" />点券
+              </div>
+              <div class="mt-2 text-lg font-bold">
+                {{ status?.status?.coupon || 0 }}
+              </div>
             </div>
-            <div class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] p-3">
-              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]"><div class="i-carbon-circle-filled text-amber-500" />金豆</div>
-              <div class="mt-2 text-lg font-bold">{{ status?.status?.goldBean || 0 }}</div>
+            <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
+              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]">
+                <div class="i-carbon-circle-filled text-amber-500" />金豆
+              </div>
+              <div class="mt-2 text-lg font-bold">
+                {{ status?.status?.goldBean || 0 }}
+              </div>
             </div>
           </div>
         </div>
@@ -533,14 +545,18 @@ useIntervalFn(updateCountdowns, 1000)
               <div class="i-carbon-sprout text-[var(--color-success)]" />
               农场
             </div>
-            <div class="font-mono text-base font-bold">{{ nextFarmCheck }}</div>
+            <div class="text-base font-bold font-mono">
+              {{ nextFarmCheck }}
+            </div>
           </div>
           <div class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-3">
             <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
               <div class="i-carbon-user-multiple text-[var(--theme-primary)]" />
               好友
             </div>
-            <div class="font-mono text-base font-bold">{{ nextFriendCheck }}</div>
+            <div class="text-base font-bold font-mono">
+              {{ nextFriendCheck }}
+            </div>
           </div>
         </div>
       </section>
@@ -548,7 +564,7 @@ useIntervalFn(updateCountdowns, 1000)
 
     <div class="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
       <!-- Logs -->
-      <section class="ds-card flex min-h-[28rem] flex-col overflow-hidden">
+      <section class="ds-card min-h-[28rem] flex flex-col overflow-hidden">
         <div class="flex flex-col gap-3 border-b border-[var(--color-border-default)] p-4 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex items-center gap-2 text-lg font-semibold">
             <div class="i-carbon-cloud-logging text-[var(--theme-primary)]" />
@@ -559,12 +575,16 @@ useIntervalFn(updateCountdowns, 1000)
             <BaseSelect v-model="filter.event" class="w-40" :options="events" @update:model-value="onLogFilterChange" />
             <BaseSelect v-model="filter.isWarn" class="w-32" :options="logs" @update:model-value="onLogFilterChange" />
             <BaseInput v-model="filter.keyword" class="w-40" placeholder="关键词" @keyup.enter="onLogSearchTrigger" />
-            <BaseButton variant="secondary" size="sm" @click="onLogSearchTrigger">筛选</BaseButton>
-            <BaseButton variant="danger" size="sm" :loading="clearingLogs" @click="clearLogs">清空</BaseButton>
+            <BaseButton variant="secondary" size="sm" @click="onLogSearchTrigger">
+              筛选
+            </BaseButton>
+            <BaseButton variant="danger" size="sm" :loading="clearingLogs" @click="clearLogs">
+              清空
+            </BaseButton>
           </div>
         </div>
 
-        <div ref="logContainer" class="custom-scrollbar flex-1 overflow-y-auto p-4 font-mono text-xs leading-6" @scroll="onLogScroll">
+        <div ref="logContainer" class="custom-scrollbar flex-1 overflow-y-auto p-4 text-xs leading-6 font-mono" @scroll="onLogScroll">
           <EmptyState
             v-if="!allLogs.length"
             icon="i-carbon-document-blank"
@@ -601,9 +621,13 @@ useIntervalFn(updateCountdowns, 1000)
             >
               <div class="flex items-center gap-2">
                 <div class="text-base" :class="[getOpIcon(key), getOpColor(key)]" />
-                <div class="text-xs text-[var(--color-text-secondary)]">{{ getOpName(key) }}</div>
+                <div class="text-xs text-[var(--color-text-secondary)]">
+                  {{ getOpName(key) }}
+                </div>
               </div>
-              <div class="text-sm font-bold">{{ val }}</div>
+              <div class="text-sm font-bold">
+                {{ val }}
+              </div>
             </div>
           </div>
         </section>
@@ -614,21 +638,37 @@ useIntervalFn(updateCountdowns, 1000)
             关键物资
           </div>
           <div class="grid grid-cols-2 gap-2">
-            <div class="rounded-xl border border-[var(--color-border-default)] p-3">
-              <div class="text-xs text-[var(--color-text-tertiary)]">普通化肥</div>
-              <div class="mt-1 text-lg font-bold">{{ fertilizerNormal?.count || 0 }}</div>
+            <div class="border border-[var(--color-border-default)] rounded-xl p-3">
+              <div class="text-xs text-[var(--color-text-tertiary)]">
+                普通化肥
+              </div>
+              <div class="mt-1 text-lg font-bold">
+                {{ fertilizerNormal?.count || 0 }}
+              </div>
             </div>
-            <div class="rounded-xl border border-[var(--color-border-default)] p-3">
-              <div class="text-xs text-[var(--color-text-tertiary)]">有机化肥</div>
-              <div class="mt-1 text-lg font-bold">{{ fertilizerOrganic?.count || 0 }}</div>
+            <div class="border border-[var(--color-border-default)] rounded-xl p-3">
+              <div class="text-xs text-[var(--color-text-tertiary)]">
+                有机化肥
+              </div>
+              <div class="mt-1 text-lg font-bold">
+                {{ fertilizerOrganic?.count || 0 }}
+              </div>
             </div>
-            <div class="rounded-xl border border-[var(--color-border-default)] p-3">
-              <div class="text-xs text-[var(--color-text-tertiary)]">普通收藏</div>
-              <div class="mt-1 text-lg font-bold">{{ collectionNormal?.count || 0 }}</div>
+            <div class="border border-[var(--color-border-default)] rounded-xl p-3">
+              <div class="text-xs text-[var(--color-text-tertiary)]">
+                普通收藏
+              </div>
+              <div class="mt-1 text-lg font-bold">
+                {{ collectionNormal?.count || 0 }}
+              </div>
             </div>
-            <div class="rounded-xl border border-[var(--color-border-default)] p-3">
-              <div class="text-xs text-[var(--color-text-tertiary)]">稀有收藏</div>
-              <div class="mt-1 text-lg font-bold">{{ collectionRare?.count || 0 }}</div>
+            <div class="border border-[var(--color-border-default)] rounded-xl p-3">
+              <div class="text-xs text-[var(--color-text-tertiary)]">
+                稀有收藏
+              </div>
+              <div class="mt-1 text-lg font-bold">
+                {{ collectionRare?.count || 0 }}
+              </div>
             </div>
           </div>
           <div v-if="fertilizerNormal || fertilizerOrganic" class="mt-3 text-xs text-[var(--color-text-tertiary)]">

@@ -34,7 +34,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 <template>
   <div class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm" @click="!loading && onCancel()">
-    <div class="ds-surface-solid w-full max-w-md p-6 shadow-[var(--shadow-lg)]" @click.stop>
+    <div class="ds-surface-solid max-w-md w-full p-6 shadow-[var(--shadow-lg)]" @click.stop>
       <div class="mb-4 flex items-start gap-3">
         <div
           class="grid h-10 w-10 place-items-center rounded-xl"
@@ -47,10 +47,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           <div :class="type === 'danger' ? 'i-carbon-warning' : (type === 'success' ? 'i-carbon-checkmark' : 'i-carbon-information')" />
         </div>
         <div class="min-w-0 flex-1">
-          <h3 class="text-lg font-bold text-[var(--color-text-primary)]">
+          <h3 class="text-lg text-[var(--color-text-primary)] font-bold">
             {{ title || '确认操作' }}
           </h3>
-          <p class="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--color-text-secondary)]">
+          <p class="mt-2 whitespace-pre-line text-sm text-[var(--color-text-secondary)] leading-relaxed">
             {{ message || '确定要执行此操作吗？' }}
           </p>
         </div>

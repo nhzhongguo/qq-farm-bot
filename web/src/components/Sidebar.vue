@@ -123,7 +123,6 @@ watch(() => status.value?.wsError, (wsError: any) => {
   showAccountModal.value = true
 }, { deep: true })
 
-
 const displayName = computed(() => {
   const acc = currentAccount.value
   if (!acc)
@@ -430,7 +429,7 @@ async function copyToken() {
     <div class="border-b border-gray-200/50 p-4 dark:border-gray-700/50">
       <div class="group relative">
         <button
-          class="w-full flex items-center justify-between rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-subtle)] px-4 py-2.5 outline-none transition-all duration-200 hover:border-[color-mix(in_srgb,var(--theme-primary)_35%,var(--color-border-default))] hover:bg-[color-mix(in_srgb,var(--theme-primary)_8%,var(--color-bg-subtle))]"
+          class="w-full flex items-center justify-between border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] px-4 py-2.5 outline-none transition-all duration-200 hover:border-[color-mix(in_srgb,var(--theme-primary)_35%,var(--color-border-default))] hover:bg-[color-mix(in_srgb,var(--theme-primary)_8%,var(--color-bg-subtle))]"
           style="--focus-ring: var(--theme-primary)"
           @click="showUserDropdown = !showUserDropdown"
         >
