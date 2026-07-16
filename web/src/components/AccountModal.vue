@@ -5,6 +5,7 @@ import api from '@/api'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseTextarea from '@/components/ui/BaseTextarea.vue'
+import { useQqLoginStore } from '@/stores/qq-login'
 import { useWxLoginStore } from '@/stores/wx-login'
 
 const props = defineProps<{
@@ -14,10 +15,10 @@ const props = defineProps<{
 
 const emit = defineEmits(['close', 'saved'])
 
+const qqLoginStore = useQqLoginStore()
 const wxLoginStore = useWxLoginStore()
 
-// 标签页：wx-微信扫码, manual-手动填码
-const activeTab = ref<'wx' | 'manual'>('manual')
+const activeTab = ref<'qq' | 'wx' | 'manual'>('qq')
 const loading = ref(false)
 const errorMessage = ref('')
 
@@ -30,6 +31,39 @@ const form = reactive({
   code: '',
   platform: 'qq' as 'qq' | 'wx',
 })
+
+// QQ 扫码轮询
+const { pause: stopQqCheck, resume: startQqCheck } = useIntervalFn(async () => {
+  if (!['waiting', 'checking'].includes(qqLoginStore.status))
+    return
+
+  const result = await qqLoginStore.checkLogin()
+  if (result.success && result.code) {
+    stopQqCheck()
+    const uin = String(result.uin || '')
+    await addAccount({
+      id: props.editData?.id,
+      name: form.name.trim() || result.nickname || (uin ? `QQ账号${uin}` : `QQ账号${Date.now()}`),
+      code: result.code,
+      platform: 'qq',
+      loginType: 'qq_qr',
+      uin: uin || undefined,
+      qq: uin || undefined,
+      avatar: result.avatar || undefined,
+    })
+  }
+}, 2000, { immediate: false })
+
+async function loadQqQRCode() {
+  if (activeTab.value !== 'qq')
+    return
+  stopQqCheck()
+  errorMessage.value = ''
+  qqLoginStore.resetState()
+  const success = await qqLoginStore.getQRCode()
+  if (success && props.show && activeTab.value === 'qq')
+    startQqCheck()
+}
 
 // 微信扫码轮询
 const { pause: stopWxCheck, resume: startWxCheck } = useIntervalFn(async () => {
@@ -154,8 +188,47 @@ const wxQrImageSrc = computed(() => {
   return `data:image/png;base64,${wxLoginStore.qrCode}`
 })
 
-function close() {
+const isMobile = computed(() => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent))
+
+function openQqLoginUrl() {
+  if (!qqLoginStore.loginUrl)
+    return
+
+  if (!isMobile.value) {
+    window.open(qqLoginStore.loginUrl, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  try {
+    const encodedUrl = btoa(unescape(encodeURIComponent(qqLoginStore.loginUrl)))
+    window.location.href = `mqqapi://forward/url?url_prefix=${encodeURIComponent(encodedUrl)}&version=1&src_type=web`
+  }
+  catch {
+    window.location.href = qqLoginStore.loginUrl
+  }
+}
+
+async function selectTab(tab: 'qq' | 'wx' | 'manual') {
+  if (activeTab.value === tab)
+    return
+
+  stopQqCheck()
   stopWxCheck()
+  qqLoginStore.resetState()
+  wxLoginStore.resetState()
+  errorMessage.value = ''
+  activeTab.value = tab
+
+  if (tab === 'qq')
+    await loadQqQRCode()
+  else if (tab === 'wx')
+    await loadWxQRCode()
+}
+
+function close() {
+  stopQqCheck()
+  stopWxCheck()
+  qqLoginStore.resetState()
   wxLoginStore.resetState()
   emit('close')
 }
@@ -171,22 +244,19 @@ watch(() => props.show, (newVal) => {
       wxAccountName.value = props.editData.name || ''
     }
     else {
-      activeTab.value = 'manual'
+      activeTab.value = 'qq'
       form.name = ''
       form.code = ''
       form.platform = 'qq'
       wxAccountName.value = ''
+      void loadQqQRCode()
     }
   }
   else {
+    stopQqCheck()
     stopWxCheck()
+    qqLoginStore.resetState()
     wxLoginStore.resetState()
-  }
-})
-
-watch(activeTab, (tab) => {
-  if (tab === 'wx') {
-    loadWxQRCode()
   }
 })
 </script>
@@ -213,28 +283,92 @@ watch(activeTab, (tab) => {
         <!-- Tabs -->
         <div class="mb-4 flex border-b" :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 10%, transparent)' }">
           <button
-            class="flex-1 py-2 text-center text-sm font-medium transition-colors"
+            type="button"
+            class="min-w-0 flex-1 py-2 text-center text-sm font-medium transition-colors"
+            :class="activeTab === 'qq' ? 'border-b-2' : 'opacity-60'"
+            :style="{
+              color: activeTab === 'qq' ? 'var(--theme-primary)' : 'var(--theme-text)',
+              borderColor: 'var(--theme-primary)',
+            }"
+            @click="selectTab('qq')"
+          >
+            QQ扫码
+          </button>
+          <button
+            type="button"
+            class="min-w-0 flex-1 py-2 text-center text-sm font-medium transition-colors"
             :class="activeTab === 'manual' ? 'border-b-2' : 'opacity-60'"
             :style="{
               color: activeTab === 'manual' ? 'var(--theme-primary)' : 'var(--theme-text)',
               borderColor: 'var(--theme-primary)',
             }"
-            @click="activeTab = 'manual'"
+            @click="selectTab('manual')"
           >
             手动填码
           </button>
           <button
             v-if="wxLoginStore.config.enabled"
-            class="flex-1 py-2 text-center text-sm font-medium transition-colors"
+            type="button"
+            class="min-w-0 flex-1 py-2 text-center text-sm font-medium transition-colors"
             :class="activeTab === 'wx' ? 'border-b-2' : 'opacity-60'"
             :style="{
               color: activeTab === 'wx' ? 'var(--theme-primary)' : 'var(--theme-text)',
               borderColor: 'var(--theme-primary)',
             }"
-            @click="activeTab = 'wx'"
+            @click="selectTab('wx')"
           >
             微信扫码
           </button>
+        </div>
+
+        <!-- QQ扫码 Tab -->
+        <div v-if="activeTab === 'qq'" class="space-y-4">
+          <BaseInput
+            v-model="form.name"
+            label="账号备注（可选）"
+            placeholder="留空使用 QQ 昵称"
+          />
+
+          <div class="flex flex-col items-center justify-center py-4 space-y-4">
+            <div
+              v-if="qqLoginStore.qrCode"
+              class="border rounded-lg bg-white p-2"
+              :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)' }"
+            >
+              <img :src="qqLoginStore.qrCode" alt="QQ 登录二维码" class="h-48 w-48">
+            </div>
+            <div
+              v-else
+              class="h-48 w-48 flex items-center justify-center rounded-lg"
+              :style="{ background: 'color-mix(in srgb, var(--theme-bg) 90%, var(--theme-text))' }"
+            >
+              <div v-if="qqLoginStore.isLoading" i-svg-spinners-90-ring-with-bg class="text-3xl" :style="{ color: 'var(--theme-primary)' }" />
+              <span v-else class="px-4 text-center text-sm" :style="{ color: 'var(--theme-text)' }">二维码不可用</span>
+            </div>
+
+            <p class="min-h-5 text-center text-sm" :style="{ color: 'var(--theme-text)' }" aria-live="polite">
+              {{ qqLoginStore.statusMessage }}
+            </p>
+
+            <p v-if="qqLoginStore.errorMessage" class="text-center text-sm text-red-600" role="alert">
+              {{ qqLoginStore.errorMessage }}
+            </p>
+
+            <div class="flex flex-wrap justify-center gap-2">
+              <BaseButton variant="secondary" size="sm" :loading="qqLoginStore.isLoading" @click="loadQqQRCode">
+                <span class="i-carbon-renew" />
+                刷新二维码
+              </BaseButton>
+              <BaseButton v-if="isMobile && qqLoginStore.loginUrl" variant="secondary" size="sm" @click="openQqLoginUrl">
+                <span class="i-carbon-launch" />
+                打开 QQ
+              </BaseButton>
+            </div>
+          </div>
+
+          <div class="text-center text-xs opacity-60" :style="{ color: 'var(--theme-text)' }">
+            使用手机 QQ 扫码，确认后自动添加账号
+          </div>
         </div>
 
         <!-- 微信扫码 Tab -->

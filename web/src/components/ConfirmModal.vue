@@ -3,6 +3,7 @@ import { onMounted, onUnmounted } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 
 const props = defineProps<{
+  show: boolean
   title?: string
   message?: string
   confirmText?: string
@@ -33,7 +34,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm" @click="!loading && onCancel()">
+  <div v-if="show" class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm" @click="!loading && onCancel()">
     <div class="ds-surface-solid max-w-md w-full p-6 shadow-[var(--shadow-lg)]" @click.stop>
       <div class="mb-4 flex items-start gap-3">
         <div
