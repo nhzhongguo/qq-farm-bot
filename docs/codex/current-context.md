@@ -1,6 +1,6 @@
 # Current Context
 
-- Updated: 2026-07-16 00:16:28 +08:00
+- Updated: 2026-07-16 20:10:00 +08:00
 - Project: QQ农场
 - Project phase: testing/stabilization
 - Memory landing policy: ask-by-default
@@ -9,23 +9,24 @@
   - web-panel: web, Vue 3, Vite
   - data-safety: atomic write, bak restore, cards/users/accounts
   - auth-admin: x-admin-token, public allowlist, security headers, public rate-limit
+  - repo-privacy: origin, upstream, push target, private repository, pre-push guard
 - Active version: 2.3.2
-- Active run: function-gap-audit (complete)
+- Active run: none (last complete: account-qr-login-restore)
 - Active module: none
 - Baseline: local UI redesign commit 1020f49 on top of v2.3.2
-- Active hypothesis:
+- Active hypothesis: resolved；未全量恢复 stash，已将 QQ 扫码入口和状态机适配到当前 `/api/qr/create`、`/api/qr/check` 契约
 - Known failures:
   - 运行环境 pnpm 11.7.0 与 packageManager 声明 10.30.2 不一致（未强改）
-- Stable behavior: 多账号隔离；原子写入与 .bak；HTTP 限流；管理员强制改密；前端 Design System 已落地
+- Stable behavior: 多账号隔离；原子写入与 .bak；HTTP 限流；管理员强制改密；前端 Design System 已落地；添加账号支持 QQ扫码/微信扫码/手动填码；Git 只允许推送到指定私人 origin
 - 稳定模块保护判断: 数据安全与 HTTP 安全边界不动；业务自动化主流程不动
-- Memory hygiene: 临时请求/压力默认任务本地
-- Latest run audit: docs/codex/session-log.md#run-audit---2026-07-16---function-gap-audit
+- Memory hygiene: 用户使用“一定要记得/不要推送错地方”的明确绝对措辞；远端隐私规则是项目级硬边界
+- Latest run audit: docs/codex/session-log.md#run-audit---2026-07-16---account-qr-login-restore
 - Artifact discipline: 审计报告与 docs/audit/sources 外部证据快照可复用
 - Encoding check: 审计与记忆 Markdown 严格 UTF-8、无 BOM、无 mojibake
-- Pressure signals:
+- Pressure signals: 强调私人仓库隐私，禁止推送到错误远端
 - Rejected approaches: major 依赖升级、架构重写、cookie 鉴权大迁移、全站全局限流、业务逻辑大重写
-- Regression guards: core/test/data-safety.test.js, core/test/http-security.test.js, web/e2e/auth-smoke.spec.ts
-- Evidence links: docs/audit/function-gap-audit-2026-07-15.md；docs/audit/sources/；docs/codex/capsules/C04-function-gap-audit.md；commit 1020f49；既有质量门 lint/test/build/e2e passed
+- Regression guards: core/test/data-safety.test.js, core/test/http-security.test.js, web/e2e/auth-smoke.spec.ts；浏览器验证三种登录入口和 QQ QR 图片；推送前核验 `git remote get-url --push origin`；本地 `.git/hooks/pre-push` 拦截非指定远端；`upstream` push URL 本地禁用
+- Evidence links: docs/codex/tasks/account-qr-login-restore/active-task.md；docs/codex/capsules/C05-remote-privacy-boundary.md；QQ QR 浏览器验证为 300x300 PNG；web lint/build、core lint/test、e2e 全绿
 - Session log: docs/codex/session-log.md
-- Next step: 无活动任务；等待用户决定是否实施报告中的第一批 M2/M4/M5/M1/M10
-- Do not assume: 审计缺口尚未实现；提交与推送状态以当前 git/远端为准
+- Next step: None；等待新的迭代任务
+- Do not assume: 微信二维码无需外部服务；当前配置仍依赖微信协议服务或代理 API；不得把任何其他远端视为可推送目标；改变私人 origin 需要用户新的明确授权

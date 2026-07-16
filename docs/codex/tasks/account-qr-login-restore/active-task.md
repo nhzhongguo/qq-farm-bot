@@ -1,0 +1,29 @@
+# Active Task
+
+- Updated: 2026-07-16 20:10:00 +08:00
+- Status: complete
+- Mode: scoped build / stabilization complete
+- Project: QQ农场
+- User goal: 恢复此前已经实现的农场账号 QQ 扫码登录和微信扫码登录入口
+- Scope: 账号添加弹窗、QQ 扫码前端状态、现有 QQ/微信登录 API 契约、浏览器交互验证
+- Stable behavior: 当前手动填码、微信扫码、账号归属/额度、HTTP 鉴权、数据安全、ConfirmModal 修复、私人仓库推送边界
+- 稳定模块保护判断: 只恢复账号登录入口；不整体弹出包含 55 个文件的 stash，不改 worker 农场主流程，不覆盖当前安全加固
+- Allowed changes: `web/src/components/AccountModal.vue`、新增 `web/src/stores/qq-login.ts`；仅在现有 API 契约确有缺口时小范围修改 QR 后端
+- Forbidden changes: `git stash pop/apply` 全量恢复；修改 core/data；推送 upstream/其他远端
+- Artifact discipline: 复用 `refs/stash` 中已实现的 QQ/微信扫码设计和当前 `/api/qr/create`、`/api/qr/check` 后端
+- Memory hygiene: 用户澄清的是已实现功能回归，作为本任务恢复目标；私人仓库规则继续是项目级硬边界
+- Current step: complete；QQ扫码/微信扫码/手动填码三入口已恢复并通过验证
+- Completed:
+  - 已确认当前 AccountModal 只剩手动填码和微信扫码
+  - 已确认 current backend 仍有 QQ QR create/check 接口
+  - 已定位 `refs/stash` 中完整的 QQ扫码/微信扫码/手动填码版本及 `qq-login.ts`
+  - 用户明确要求完成后提交并推送，使本地与私人 origin 完全一致
+  - 新增适配当前 `code/url/image` 与 `{ code }` 契约的 `qq-login` store
+  - AccountModal 已恢复 QQ扫码/手动填码/微信扫码并在切换或关闭时停止轮询
+  - 浏览器获取到 300x300 QQ QR PNG，状态进入“等待扫码”；手动和微信面板均可切换
+  - 微信面板在本机协议服务未运行时按现有设计显示明确连接错误
+  - ConfirmModal 不再常驻遮挡页面
+- Next exact step: None
+- Validation gates: web lint passed；web build passed；core lint passed；core tests 13/13 passed；web e2e 5/5 passed；浏览器三入口及 QQ create/check passed；ConfirmModal 回归 passed；Git 私人 origin 同步由最终推送核验完成
+- Rollback/backups: `refs/stash` 保持不动；本轮文件可按 git diff 精确回退
+- Resume instruction: 继续 account-qr-login-restore；先读本文件和 C05 私人仓库边界，禁止全量恢复 stash

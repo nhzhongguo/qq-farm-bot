@@ -1,8 +1,8 @@
 # Context Index
 
-- Updated: 2026-07-16 00:16:28 +08:00
+- Updated: 2026-07-16 20:10:00 +08:00
 - Project: QQ农场
-- Current anchor: none (last complete: tasks/function-gap-audit)
+- Current anchor: none (last complete: tasks/account-qr-login-restore)
 - Memory landing policy: ask-by-default
 - Task branches:
   - test-and-upgrade-v230: 全面测试与升级 / complete
@@ -11,6 +11,7 @@
   - uiux-full-redesign: 第一轮 UI 重构 / complete
   - friends-settings-e2e-ui-commit: Friends/Settings 深改 + e2e + commit / complete
   - function-gap-audit: 三步功能缺口审计与行业矩阵 / complete
+  - account-qr-login-restore: 恢复 QQ扫码/微信扫码/手动填码三入口 / complete
 - Active version: 2.3.2
 - Active topic: none
 - Project phase: testing/stabilization
@@ -19,17 +20,20 @@
   - web-panel: web, Vue, Vite
   - data-safety: atomic write, bak restore, cards, accounts
   - auth-admin: token auth, public allowlist, headers, rate-limit
+  - repo-privacy: origin, upstream, push, private repository, remote URL, pre-push
 - Module index:
   - data-safety: keywords=users.json,cards.json,accounts.json,atomic,.bak,card-claim,timingSafeEqual; route=C01-data-safety-upgrade; reason=v2.3.1 数据安全与备份加固
   - auth-admin: keywords=login,register,card-claim,rate-limit,x-admin-token,security-headers,public-allowlist; route=C02-http-security-oss-upgrade; reason=v2.3.2 HTTP 安全、白名单与限流
   - web-panel: keywords=vue,build,Friends,Settings,design-system,e2e,playwright; route=C03-uiux-analysis; reason=UI 重构批次 1020f49
   - deps-security: keywords=pnpm audit,overrides,node-fetch,native-fetch; route=C02-http-security-oss-upgrade; reason=移除 node-fetch；prod audit 清洁
   - function-gap-audit: keywords=功能缺口,已实现清单,半成品,行业矩阵,刚需必补,体验优化,长期拓展,n8n,Airflow,Kestra,ALAS; route=C04-function-gap-audit; reason=v2.3.2 三步功能补全审计结论与证据入口
+  - repo-privacy: keywords=提交,推送,push,origin,upstream,私人仓库,隐私,远端; route=C05-remote-privacy-boundary; reason=项目级硬边界，只允许推送到指定私人 origin
 - Capsules:
   - C01-data-safety-upgrade: 数据安全与备份升级 v2.3.1
   - C02-http-security-oss-upgrade: HTTP 安全与开源对照升级 v2.3.2
   - C02-learning-notes-oss: 开源项目对照学习记录
   - C03-uiux-analysis: UI/UX 全面分析与设计方向
   - C04-function-gap-audit: v2.3.2 功能缺口审计结论、优先级与证据入口
+  - C05-remote-privacy-boundary: 私人仓库唯一推送目标与推送前后核验规则
 - Session log: docs/codex/session-log.md
 - Evidence store: docs/codex/capsules/
