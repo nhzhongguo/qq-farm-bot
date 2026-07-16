@@ -37,6 +37,13 @@ export const menuRoutes: MenuItem[] = [
     component: () => import('@/views/Analytics.vue'),
   },
   {
+    path: 'scheduler',
+    name: 'scheduler',
+    label: '调度',
+    icon: 'i-carbon-time',
+    component: () => import('@/views/Scheduler.vue'),
+  },
+  {
     path: 'settings',
     name: 'Settings',
     label: '设置',

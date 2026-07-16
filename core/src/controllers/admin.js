@@ -19,10 +19,37 @@ const { findAccountByRef, normalizeAccountRef, resolveAccountId } = require('../
 const { createModuleLogger } = require('../services/logger');
 const { MiniProgramLoginSession } = require('../services/qrlogin');
 const { getSchedulerRegistrySnapshot } = require('../services/scheduler');
+const { WxLoginClient, WxLoginClientError } = require('../services/wx-login-client');
+const { WxLoginSessionError, wxLoginSessionManager } = require('../services/wx-login-session');
 const userStore = require('../models/user-store');
 const { rateLimitMiddleware, resetRateLimitStore } = require('../services/security');
 
 const adminLogger = createModuleLogger('admin');
+
+function getWxLoginRuntimeConfig() {
+    const storedConfig = store.getGlobalWxConfig();
+    return {
+        ...storedConfig,
+        apiKey: process.env.WX_PROXY_API_KEY || storedConfig.apiKey || '',
+        proxyApiUrl: process.env.WX_PROXY_API_URL || storedConfig.proxyApiUrl || storedConfig.apiBase,
+        appId: process.env.WX_PROXY_APP_ID || storedConfig.appId || 'wx5306c5978fdb76e4',
+    };
+}
+
+function toPublicWxConfig(config) {
+    const value = config && typeof config === 'object' ? config : {};
+    const apiKey = String(value.apiKey || '').trim();
+    return {
+        enabled: value.enabled !== false,
+        apiBase: String(value.apiBase || '').trim(),
+        proxyApiUrl: String(value.proxyApiUrl || '').trim(),
+        appId: String(value.appId || '').trim(),
+        autoAddAccount: value.autoAddAccount !== false,
+        userIsolation: value.userIsolation !== false,
+        apiKeyConfigured: Boolean(apiKey),
+        apiKeyHint: apiKey ? `已配置（末尾 ${apiKey.slice(-4)}）` : '未配置',
+    };
+}
 
 let app = null;
 let server = null;
@@ -104,15 +131,47 @@ function startAdminServer(dataProvider) {
     }
 
     const tokens = new Set();
+    const tokenSessions = new Map();
+    const sessionAbsoluteTtlMs = Math.max(1_000, Number(process.env.SESSION_ABSOLUTE_TTL_MS) || 12 * 60 * 60 * 1000);
+    const sessionIdleTtlMs = Math.max(1_000, Number(process.env.SESSION_IDLE_TTL_MS) || 2 * 60 * 60 * 1000);
 
     const issueToken = () => crypto.randomBytes(24).toString('hex');
+    const invalidateToken = (token) => {
+        tokens.delete(token);
+        tokenUserMap.delete(token);
+        tokenSessions.delete(token);
+        if (io) {
+            for (const socket of io.sockets.sockets.values()) {
+                if (String(socket.data.adminToken || '') === String(token)) {
+                    socket.disconnect(true);
+                }
+            }
+        }
+    };
+    const getValidSessionUser = (token, touch = true) => {
+        if (!token || !tokens.has(token)) return null;
+        const session = tokenSessions.get(token);
+        const now = Date.now();
+        if (!session || now >= session.expiresAt || now - session.lastSeenAt >= sessionIdleTtlMs) {
+            invalidateToken(token);
+            return null;
+        }
+        const user = tokenUserMap.get(token);
+        if (!user) {
+            invalidateToken(token);
+            return null;
+        }
+        if (touch) session.lastSeenAt = now;
+        return user;
+    };
     const authRequired = (req, res, next) => {
         const token = req.headers['x-admin-token'];
-        if (!token || !tokens.has(token)) {
+        const currentUser = getValidSessionUser(token);
+        if (!currentUser) {
             return res.status(401).json({ ok: false, error: 'Unauthorized' });
         }
         req.adminToken = token;
-        req.currentUser = tokenUserMap.get(token);
+        req.currentUser = currentUser;
 
         // 管理员不检查封禁和过期
         if (req.currentUser && req.currentUser.role !== 'admin') {
@@ -121,8 +180,7 @@ function startAdminServer(dataProvider) {
                 // 检查是否被封禁
                 if (req.currentUser.card.enabled === false) {
                     console.log('[请求拒绝] 用户已被封禁:', req.currentUser.username);
-                    tokens.delete(token);
-                    tokenUserMap.delete(token);
+                    invalidateToken(token);
                     return res.status(403).json({ ok: false, error: '账号已被封禁，请联系管理员' });
                 }
 
@@ -131,8 +189,7 @@ function startAdminServer(dataProvider) {
                     const now = Date.now();
                     if (req.currentUser.card.expiresAt < now) {
                         console.log('[请求拒绝] 用户已过期:', req.currentUser.username);
-                        tokens.delete(token);
-                        tokenUserMap.delete(token);
+                        invalidateToken(token);
                         return res.status(403).json({ ok: false, error: '账号已过期，请续费后重新登录' });
                     }
                 }
@@ -176,11 +233,12 @@ function startAdminServer(dataProvider) {
     // 检查用户是否有权访问（管理员或普通用户）
     const checkUserAccess = (req, res, next) => {
         const token = req.headers['x-admin-token'];
-        if (!token || !tokens.has(token)) {
+        const currentUser = getValidSessionUser(token);
+        if (!currentUser) {
             return res.status(401).json({ ok: false, error: 'Unauthorized' });
         }
         req.adminToken = token;
-        req.currentUser = tokenUserMap.get(token);
+        req.currentUser = currentUser;
 
         // 管理员不检查封禁和过期
         if (req.currentUser && req.currentUser.role !== 'admin') {
@@ -189,8 +247,7 @@ function startAdminServer(dataProvider) {
                 // 检查是否被封禁
                 if (req.currentUser.card.enabled === false) {
                     console.log('[请求拒绝] 用户已被封禁:', req.currentUser.username);
-                    tokens.delete(token);
-                    tokenUserMap.delete(token);
+                    invalidateToken(token);
                     return res.status(403).json({ ok: false, error: '账号已被封禁，请联系管理员' });
                 }
 
@@ -199,8 +256,7 @@ function startAdminServer(dataProvider) {
                     const now = Date.now();
                     if (req.currentUser.card.expiresAt < now) {
                         console.log('[请求拒绝] 用户已过期:', req.currentUser.username);
-                        tokens.delete(token);
-                        tokenUserMap.delete(token);
+                        invalidateToken(token);
                         return res.status(403).json({ ok: false, error: '账号已过期，请续费后重新登录' });
                     }
                 }
@@ -216,7 +272,11 @@ function startAdminServer(dataProvider) {
         const usersToCleanup = [];
 
         for (const [token, user] of tokenUserMap.entries()) {
-            if (user.role === 'admin') continue; // 管理员不检查
+            if (!getValidSessionUser(token, false)) {
+                usersToCleanup.push({ token, username: user.username, reason: 'session_expired' });
+                continue;
+            }
+            if (user.role === 'admin') continue; // 管理员不检查卡密状态
 
             // 检查是否被封禁
             if (user.card && user.card.enabled === false) {
@@ -233,17 +293,9 @@ function startAdminServer(dataProvider) {
         }
 
         for (const { token, username, reason } of usersToCleanup) {
-            tokens.delete(token);
-            tokenUserMap.delete(token);
-            // 断开相关 socket 连接
-            if (io) {
-                for (const socket of io.sockets.sockets.values()) {
-                    if (String(socket.data.adminToken || '') === String(token)) {
-                        socket.disconnect(true);
-                    }
-                }
-            }
-            console.log(`[自动清理] 用户 ${username} 已${reason === 'banned' ? '被封禁' : '过期'}，已强制下线`);
+            invalidateToken(token);
+            const label = reason === 'banned' ? '被封禁' : reason === 'expired' ? '过期' : '会话过期';
+            console.log(`[自动清理] 用户 ${username} 已${label}，已强制下线`);
         }
     };
 
@@ -337,6 +389,12 @@ function startAdminServer(dataProvider) {
             const token = issueToken();
             tokens.add(token);
             tokenUserMap.set(token, user);
+            const createdAt = Date.now();
+            tokenSessions.set(token, {
+                createdAt,
+                lastSeenAt: createdAt,
+                expiresAt: createdAt + sessionAbsoluteTtlMs,
+            });
             
             adminLogger.info('登录成功', { username, role: user.role, ip: clientIp });
 
@@ -356,7 +414,8 @@ function startAdminServer(dataProvider) {
                     card: user.card, 
                     accountLimit: user.accountLimit || userStore.DEFAULT_ACCOUNT_LIMIT || 2,
                     user: { username: user.username },
-                    mustChangePassword: user.mustChangePassword || false
+                    mustChangePassword: user.mustChangePassword || false,
+                    sessionExpiresAt: createdAt + sessionAbsoluteTtlMs,
                 } 
             });
         }
@@ -502,7 +561,24 @@ function startAdminServer(dataProvider) {
         if (publicExactPaths.has(req.path)) return next();
         // card info preview for renew UI (path param)
         if (req.method === 'GET' && /^\/card\/info\/[^/]+$/.test(req.path)) return next();
-        return authRequired(req, res, next);
+        return authRequired(req, res, () => {
+            // A default or reset password must not grant a usable management session.
+            // Keep the small allowlist necessary to prove the session, change the password,
+            // or terminate it; every operational endpoint stays unavailable until then.
+            const passwordChangeAllowlist = new Set([
+                '/auth/validate',
+                '/user/change-password',
+                '/logout',
+            ]);
+            if (req.currentUser?.mustChangePassword && !passwordChangeAllowlist.has(req.path)) {
+                return res.status(403).json({
+                    ok: false,
+                    code: 'PASSWORD_CHANGE_REQUIRED',
+                    error: '请先修改初始密码后再使用系统',
+                });
+            }
+            return next();
+        });
     });
 
     // 管理员密码修改已移除，统一使用 /api/user/change-password 接口
@@ -543,15 +619,7 @@ function startAdminServer(dataProvider) {
     app.post('/api/logout', (req, res) => {
         const token = req.adminToken;
         if (token) {
-            tokens.delete(token);
-            tokenUserMap.delete(token);
-            if (io) {
-                for (const socket of io.sockets.sockets.values()) {
-                    if (String(socket.data.adminToken || '') === String(token)) {
-                        socket.disconnect(true);
-                    }
-                }
-            }
+            invalidateToken(token);
         }
         res.json({ ok: true });
     });
@@ -1776,7 +1844,7 @@ function startAdminServer(dataProvider) {
     app.get('/api/admin/wx-config', authRequired, adminRequired, (req, res) => {
         try {
             const config = store.getGlobalWxConfig();
-            res.json({ ok: true, data: config });
+            res.json({ ok: true, data: toPublicWxConfig(config) });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }
@@ -1787,7 +1855,7 @@ function startAdminServer(dataProvider) {
         try {
             const config = req.body || {};
             const saved = store.setGlobalWxConfig(config);
-            res.json({ ok: true, data: saved });
+            res.json({ ok: true, data: toPublicWxConfig(saved) });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }
@@ -2024,15 +2092,7 @@ function startAdminServer(dataProvider) {
             // 强制下线该用户的所有会话
             for (const [token, user] of tokenUserMap.entries()) {
                 if (user.username === username) {
-                    tokens.delete(token);
-                    tokenUserMap.delete(token);
-                    if (io) {
-                        for (const socket of io.sockets.sockets.values()) {
-                            if (String(socket.data.adminToken || '') === String(token)) {
-                                socket.disconnect(true);
-                            }
-                        }
-                    }
+                    invalidateToken(token);
                 }
             }
             res.json({ ok: true });
@@ -2102,7 +2162,7 @@ function startAdminServer(dataProvider) {
 
             const config = req.body || {};
             const saved = store.setGlobalWxConfig(config);
-            res.json({ ok: true, config: saved });
+            res.json({ ok: true, config: toPublicWxConfig(saved) });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }
@@ -2116,15 +2176,17 @@ function startAdminServer(dataProvider) {
                 return res.status(401).json({ ok: false, error: '未登录' });
             }
 
-            // 普通用户获取全局配置，管理员可以获取并修改全局配置
-            const globalConfig = store.getGlobalWxConfig();
-            const { apiKey, ...publicConfig } = globalConfig;
+            const globalConfig = getWxLoginRuntimeConfig();
+            const apiKeyMode = Boolean(String(globalConfig.apiKey || '').trim());
+            const endpoint = apiKeyMode ? globalConfig.proxyApiUrl : globalConfig.apiBase;
             res.json({
                 ok: true,
                 config: {
-                    ...publicConfig,
-                    apiKey: '',
-                    hasApiKey: !!String(apiKey || '').trim(),
+                    enabled: globalConfig.enabled !== false,
+                    configured: Boolean(String(endpoint || '').trim()),
+                    mode: apiKeyMode ? 'proxy' : 'local',
+                    autoAddAccount: globalConfig.autoAddAccount !== false,
+                    userIsolation: globalConfig.userIsolation !== false,
                 },
             });
         } catch (e) {
@@ -2460,60 +2522,87 @@ function startAdminServer(dataProvider) {
         }
     });
 
-    // ============ 微信登录代理 API ============
-    // 用于转发请求到第三方微信登录 API（如 api.aineishe.com）
-    app.post('/api/proxy', async (req, res) => {
-        const { action, ...params } = req.body || {};
-        const allowedActions = new Set(['getqr', 'checkqr', 'jslogin']);
-
-        if (!allowedActions.has(action)) {
-            return res.status(400).json({ code: -1, msg: '不支持的 action 参数' });
+    // ============ 微信扫码登录（服务端持有上游凭证和会话） ============
+    const handleWxLoginError = (res, error) => {
+        if (error instanceof WxLoginSessionError) {
+            return res.status(error.statusCode).json({ ok: false, error: error.message, code: error.code });
         }
+        adminLogger.warn('WX QR login failed', { errorType: error && error.name ? error.name : 'Error' });
+        return res.status(502).json({ ok: false, error: '微信扫码服务暂时不可用，请稍后重试' });
+    };
 
-        const wxConfig = store.getGlobalWxConfig();
-        const apiUrl = process.env.WX_PROXY_API_URL || wxConfig.proxyApiUrl || wxConfig.apiBase;
-        const apiKey = process.env.WX_PROXY_API_KEY || wxConfig.apiKey || '';
-        const appId = process.env.WX_PROXY_APP_ID || wxConfig.appId || 'wx5306c5978fdb76e4';
-
-        if (!apiKey) {
-            return res.status(400).json({ code: -1, msg: '缺少 API Key' });
-        }
-
-        let proxyUrl;
+    app.post('/api/wx-login/qr', async (req, res) => {
         try {
-            proxyUrl = new URL(apiUrl);
-        } catch {
-            return res.status(400).json({ code: -1, msg: '代理 API 地址无效' });
-        }
-        if (proxyUrl.protocol !== 'http:' && proxyUrl.protocol !== 'https:') {
-            return res.status(400).json({ code: -1, msg: '代理 API 仅支持 HTTP 或 HTTPS' });
-        }
-
-        // 如果是 jslogin 动作，自动添加 appid
-        if (action === 'jslogin') {
-            params.appid = appId;
-        }
-
-        try {
-            proxyUrl.searchParams.set('api_key', apiKey);
-            proxyUrl.searchParams.set('action', action);
-            adminLogger.info('proxy request', { action, apiUrl: proxyUrl.origin });
-
-            const response = await fetch(proxyUrl.toString(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(params)
-            });
-
-            const data = await response.json();
-            res.json(data);
+            const result = await wxLoginSessionManager.create(
+                req.currentUser && req.currentUser.username,
+                getWxLoginRuntimeConfig(),
+            );
+            res.json({ ok: true, data: result });
         } catch (error) {
-            adminLogger.error('proxy error', { error: error.message, action });
-            res.status(500).json({
-                code: -1,
-                msg: `代理请求失败: ${  error.message}`,
+            handleWxLoginError(res, error);
+        }
+    });
+
+    app.get('/api/admin/wx-config/health', authRequired, adminRequired, async (req, res) => {
+        try {
+            const config = getWxLoginRuntimeConfig();
+            const client = new WxLoginClient(config, { timeoutMs: 5000 });
+            const result = await client.probe();
+            res.json({
+                ok: true,
+                data: {
+                    status: 'reachable',
+                    reachable: result.reachable,
+                    statusCode: result.statusCode,
+                    checkedAt: Date.now(),
+                },
+            });
+        } catch (error) {
+            const safeError = error instanceof WxLoginClientError
+                ? error
+                : new WxLoginClientError('微信登录服务暂时不可用，请稍后重试', 503, 'WX_LOGIN_SERVICE_UNAVAILABLE');
+            res.status(safeError.statusCode).json({
+                ok: false,
+                data: { status: 'unavailable', reachable: false, checkedAt: Date.now() },
+                error: safeError.message,
+                code: safeError.code,
             });
         }
+    });
+
+    app.post('/api/wx-login/check', async (req, res) => {
+        const sessionId = String((req.body && req.body.sessionId) || '').trim();
+        if (!sessionId) return res.status(400).json({ ok: false, error: '缺少微信扫码会话 ID' });
+        try {
+            const result = await wxLoginSessionManager.check(sessionId, req.currentUser && req.currentUser.username);
+            res.json({ ok: true, data: result });
+        } catch (error) {
+            handleWxLoginError(res, error);
+        }
+    });
+
+    app.post('/api/wx-login/code', async (req, res) => {
+        const sessionId = String((req.body && req.body.sessionId) || '').trim();
+        if (!sessionId) return res.status(400).json({ ok: false, error: '缺少微信扫码会话 ID' });
+        try {
+            const result = await wxLoginSessionManager.getCode(sessionId, req.currentUser && req.currentUser.username);
+            res.json({ ok: true, data: result });
+        } catch (error) {
+            handleWxLoginError(res, error);
+        }
+    });
+
+    app.delete('/api/wx-login/:sessionId', (req, res) => {
+        try {
+            wxLoginSessionManager.cancel(req.params.sessionId, req.currentUser && req.currentUser.username);
+            res.json({ ok: true });
+        } catch (error) {
+            handleWxLoginError(res, error);
+        }
+    });
+
+    app.post('/api/proxy', (req, res) => {
+        res.status(410).json({ code: -1, msg: '微信扫码接口已升级，请刷新页面后重试' });
     });
 
     app.get('*', (req, res) => {
@@ -2625,7 +2714,17 @@ function startAdminServer(dataProvider) {
     io = new SocketIOServer(server, {
         path: '/socket.io',
         cors: {
-            origin: '*',
+            origin(origin, callback) {
+                const allowedOrigins = CONFIG.ALLOWED_ORIGINS || [
+                    'http://localhost:5173',
+                    'http://localhost:3000',
+                    'http://127.0.0.1:5173',
+                ];
+                if (!origin || allowedOrigins.includes(origin)) {
+                    return callback(null, true);
+                }
+                return callback(new Error('Origin not allowed'));
+            },
             methods: ['GET', 'POST'],
             allowedHeaders: ['x-admin-token', 'x-account-id'],
         },
@@ -2639,12 +2738,13 @@ function startAdminServer(dataProvider) {
             ? String(socket.handshake.headers['x-admin-token'])
             : '';
         const token = authToken || headerToken;
-        if (!token || !tokens.has(token)) {
+        const currentUser = getValidSessionUser(token);
+        if (!currentUser) {
             return next(new Error('Unauthorized'));
         }
         socket.data.adminToken = token;
         // 存储用户信息到socket
-        socket.data.user = tokenUserMap.get(token);
+        socket.data.user = currentUser;
         return next();
     });
 

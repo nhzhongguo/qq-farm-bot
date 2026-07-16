@@ -26,7 +26,7 @@ app.config.errorHandler = (err: any, _instance, info) => {
   const message = err.message || String(err)
   if (message.includes('ResizeObserver loop'))
     return
-  toast.error(`应用错误: ${message}`)
+  toast.error('应用发生错误，请刷新页面后重试')
 }
 
 window.addEventListener('unhandledrejection', (event) => {
@@ -35,15 +35,14 @@ window.addEventListener('unhandledrejection', (event) => {
     return
 
   console.error('Unhandled Rejection:', reason)
-  const message = reason?.message || String(reason)
-  toast.error(`异步错误: ${message}`)
+  toast.error('操作未能完成，请稍后重试')
 })
 
 window.onerror = (message, _source, _lineno, _colno, error) => {
   console.error('Global Error:', message, error)
   if (String(message).includes('Script error'))
     return
-  toast.error(`系统错误: ${message}`)
+  toast.error('系统发生错误，请刷新页面后重试')
 }
 
 const appStore = useAppStore()

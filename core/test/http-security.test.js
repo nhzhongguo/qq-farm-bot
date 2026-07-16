@@ -8,6 +8,8 @@ const { test, before, after } = require('node:test');
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'qq-farm-http-test-'));
 process.env.FARM_DATA_DIR = dataDir;
 process.env.ADMIN_PORT = process.env.ADMIN_PORT || '13019';
+process.env.SESSION_ABSOLUTE_TTL_MS = '2000';
+process.env.SESSION_IDLE_TTL_MS = '2000';
 
 const { startAdminServer, stopAdminServer, resetPublicRateLimits } = require('../src/controllers/admin');
 
@@ -131,6 +133,95 @@ test('login issues token and unlocks protected route', async () => {
         headers: { 'x-admin-token': 'not-a-real-token' },
     });
     assert.equal(badToken.status, 401);
+});
+
+test('initial administrator must change the default password before accessing operations', async () => {
+    await waitReady();
+
+    const loginRes = await request('POST', '/api/login', {
+        body: { username: 'admin', password: 'admin' },
+    });
+    const token = loginRes.json?.data?.token;
+    assert.equal(typeof token, 'string');
+
+    const blocked = await request('GET', '/api/scheduler', {
+        headers: { 'x-admin-token': token },
+    });
+    assert.equal(blocked.status, 403);
+    assert.equal(blocked.json?.code, 'PASSWORD_CHANGE_REQUIRED');
+
+    const changed = await request('POST', '/api/user/change-password', {
+        headers: { 'x-admin-token': token },
+        body: { oldPassword: 'admin', newPassword: 'Admin123!' },
+    });
+    assert.equal(changed.status, 200);
+    assert.equal(changed.json?.ok, true);
+
+    const scheduler = await request('GET', '/api/scheduler', {
+        headers: { 'x-admin-token': token },
+    });
+    assert.equal(scheduler.status, 200);
+});
+
+test('expired management sessions are rejected and removed', async () => {
+    await waitReady();
+
+    const loginRes = await request('POST', '/api/login', {
+        body: { username: 'admin', password: 'Admin123!' },
+    });
+    const token = loginRes.json?.data?.token;
+    assert.equal(typeof token, 'string');
+
+    await new Promise(resolve => setTimeout(resolve, 2100));
+
+    const expired = await request('GET', '/api/auth/validate', {
+        headers: { 'x-admin-token': token },
+    });
+    assert.equal(expired.status, 401);
+    assert.equal(expired.json?.ok, false);
+});
+
+test('wechat QR login stays same-origin and reports an unavailable local service', async () => {
+    await waitReady();
+
+    const loginRes = await request('POST', '/api/login', {
+        body: { username: 'admin', password: 'Admin123!' },
+    });
+    const token = loginRes.json?.data?.token;
+    assert.equal(typeof token, 'string');
+    const headers = { 'x-admin-token': token };
+
+    const saveRes = await request('POST', '/api/admin/wx-config', {
+        headers,
+        body: {
+            enabled: true,
+            apiBase: 'http://127.0.0.1:1/api',
+            apiKey: '',
+            proxyApiUrl: 'https://wx.example.test/api',
+            appId: 'wx5306c5978fdb76e4',
+            autoAddAccount: true,
+            userIsolation: true,
+        },
+    });
+    assert.equal(saveRes.status, 200);
+    assert.equal('apiKey' in saveRes.json?.data, false);
+    assert.equal(saveRes.json?.data?.apiKeyConfigured, false);
+
+    const adminConfig = await request('GET', '/api/admin/wx-config', { headers });
+    assert.equal(adminConfig.status, 200);
+    assert.equal('apiKey' in adminConfig.json?.data, false);
+
+    const configRes = await request('GET', '/api/user/wxlogin-config', { headers });
+    assert.equal(configRes.status, 200);
+    assert.equal(configRes.json?.config?.mode, 'local');
+    assert.equal('apiBase' in configRes.json.config, false);
+    assert.equal('apiKey' in configRes.json.config, false);
+
+    const qrRes = await request('POST', '/api/wx-login/qr', { headers, body: {} });
+    assert.equal(qrRes.status, 503);
+    assert.equal(qrRes.json?.code, 'WX_LOCAL_SERVICE_UNAVAILABLE');
+    assert.match(String(qrRes.json?.error || ''), /本机微信协议服务未启动/);
+    assert.doesNotMatch(JSON.stringify(qrRes.json), /127\.0\.0\.1|wx\.example\.test/);
 });
 
 test('login endpoint attaches rate-limit headers', async () => {

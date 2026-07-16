@@ -137,6 +137,8 @@ docker compose up -d --build
 | `LOG_LEVEL` | `info` | 日志级别 |
 | `TZ` | `Asia/Shanghai` | 运行时区 |
 | `TRUST_PROXY` | 关闭 | 仅在可信反向代理后设置为 `true` |
+| `SESSION_ABSOLUTE_TTL_MS` | `43200000` | 管理面板会话的最长有效期（12 小时） |
+| `SESSION_IDLE_TTL_MS` | `7200000` | 管理面板无活动自动退出时间（2 小时） |
 | `WX_PROXY_API_URL` | 后台配置 | 微信登录代理地址 |
 | `WX_PROXY_API_KEY` | 后台配置 | 微信登录代理密钥 |
 | `WX_PROXY_APP_ID` | 内置 App ID | 微信小程序 App ID |

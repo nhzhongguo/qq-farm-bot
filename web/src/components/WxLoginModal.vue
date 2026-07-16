@@ -25,16 +25,16 @@ const { pause: stopCheck, resume: startCheck } = useIntervalFn(async () => {
 
   const result = await wxLoginStore.checkLogin()
 
-  if (result.success && result.wxid) {
+  if (result.success) {
     stopCheck()
 
     // 自动添加账号
-    await handleAutoAddAccount(result.wxid, result.nickname)
+    await handleAutoAddAccount(result.nickname)
   }
 }, 2000, { immediate: false })
 
 // 自动添加账号
-async function handleAutoAddAccount(wxid: string, nickname?: string) {
+async function handleAutoAddAccount(nickname?: string) {
   try {
     const result = await wxLoginStore.getFarmCode()
 
@@ -48,14 +48,9 @@ async function handleAutoAddAccount(wxid: string, nickname?: string) {
           code: result.code,
           platform: 'wx',
           loginType: 'wx_qr',
-          wxid,
         })
         emit('saved')
         close()
-      }
-      else {
-      // 不自动添加，只返回登录信息，让用户手动复制 code
-        console.warn('登录成功！Code:', result.code)
       }
     }
   }

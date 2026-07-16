@@ -71,7 +71,7 @@ const { pause: stopWxCheck, resume: startWxCheck } = useIntervalFn(async () => {
     return
   }
   const result = await wxLoginStore.checkLogin()
-  if (result.success && result.wxid) {
+  if (result.success) {
     stopWxCheck()
     // 获取Code并添加账号
     const codeResult = await wxLoginStore.getFarmCode()
@@ -85,14 +85,13 @@ const { pause: stopWxCheck, resume: startWxCheck } = useIntervalFn(async () => {
           code: codeResult.code,
           platform: 'wx',
           loginType: 'wx_qr',
-          wxid: result.wxid,
         })
       }
       else {
         // 不自动添加，只显示 code 让用户手动复制
         form.code = codeResult.code
         form.platform = 'wx'
-        activeTab.value = 'manual'
+        await selectTab('manual')
       }
     }
   }

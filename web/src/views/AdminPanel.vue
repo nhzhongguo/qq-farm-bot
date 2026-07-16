@@ -690,6 +690,12 @@ const defaultSystemConfig = ref({
 })
 
 const wxConfigSaving = ref(false)
+const wxHealthChecking = ref(false)
+const wxHealth = ref<{ status: 'idle' | 'reachable' | 'unavailable', message: string, checkedAt: number }>({
+  status: 'idle',
+  message: '尚未检查',
+  checkedAt: 0,
+})
 
 const localWxConfig = ref({
   enabled: true,
@@ -700,6 +706,8 @@ const localWxConfig = ref({
   autoAddAccount: true,
   userIsolation: true,
 })
+const wxApiKeyConfigured = ref(false)
+const wxApiKeyHint = ref('未配置')
 
 const platformOptions = [
   { label: 'QQ', value: 'qq' },
@@ -715,7 +723,10 @@ async function loadWxConfig() {
   try {
     const { data } = await api.get('/api/admin/wx-config')
     if (data?.ok && data.data) {
-      localWxConfig.value = { ...data.data }
+      const { apiKeyConfigured, apiKeyHint, ...config } = data.data
+      localWxConfig.value = { ...localWxConfig.value, ...config, apiKey: '' }
+      wxApiKeyConfigured.value = Boolean(apiKeyConfigured)
+      wxApiKeyHint.value = String(apiKeyHint || '未配置')
     }
   }
   catch (e: any) {
@@ -728,6 +739,9 @@ async function handleSaveWxConfig() {
   try {
     const { data } = await api.post('/api/admin/wx-config', localWxConfig.value)
     if (data?.ok) {
+      wxApiKeyConfigured.value = Boolean(data.data?.apiKeyConfigured)
+      wxApiKeyHint.value = String(data.data?.apiKeyHint || '未配置')
+      localWxConfig.value.apiKey = ''
       showAlert('微信配置已保存，全局应用生效', 'primary')
     }
     else {
@@ -739,6 +753,30 @@ async function handleSaveWxConfig() {
   }
   finally {
     wxConfigSaving.value = false
+  }
+}
+
+async function checkWxServiceHealth() {
+  wxHealthChecking.value = true
+  try {
+    const { data } = await api.get('/api/admin/wx-config/health')
+    const statusCode = Number(data?.data?.statusCode || 0)
+    wxHealth.value = {
+      status: 'reachable',
+      message: statusCode ? `服务可达（HTTP ${statusCode}）` : '服务可达',
+      checkedAt: Date.now(),
+    }
+  }
+  catch (error: any) {
+    const payload = error?.response?.data
+    wxHealth.value = {
+      status: 'unavailable',
+      message: String(payload?.error || '服务暂时不可用，请检查配置和本机协议服务'),
+      checkedAt: Date.now(),
+    }
+  }
+  finally {
+    wxHealthChecking.value = false
   }
 }
 
@@ -1560,6 +1598,14 @@ onMounted(() => {
 
               <div class="mt-3 flex justify-end gap-2">
                 <BaseButton
+                  variant="outline"
+                  size="sm"
+                  :loading="wxHealthChecking"
+                  @click="checkWxServiceHealth"
+                >
+                  检查服务
+                </BaseButton>
+                <BaseButton
                   variant="secondary"
                   size="sm"
                   :loading="systemConfigSaving"
@@ -1576,6 +1622,13 @@ onMounted(() => {
                   保存
                 </BaseButton>
               </div>
+              <p
+                v-if="wxHealth.status !== 'idle'"
+                class="mt-3 text-xs"
+                :class="wxHealth.status === 'reachable' ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'"
+              >
+                {{ wxHealth.message }}
+              </p>
             </div>
 
             <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
@@ -1607,10 +1660,13 @@ onMounted(() => {
                 <BaseInput
                   v-model="localWxConfig.apiKey"
                   label="API密钥"
-                  type="text"
-                  placeholder="可选，用于代理模式"
+                  type="password"
+                  :placeholder="wxApiKeyConfigured ? '留空以保留当前密钥' : '可选，用于代理模式'"
                   class="col-span-2"
                 />
+                <p class="col-span-2 -mt-2 text-xs text-[var(--color-text-secondary)]">
+                  当前密钥状态：{{ wxApiKeyHint }}
+                </p>
                 <BaseInput
                   v-model="localWxConfig.proxyApiUrl"
                   label="代理API地址"

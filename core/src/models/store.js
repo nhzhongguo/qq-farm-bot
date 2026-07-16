@@ -1312,10 +1312,14 @@ function getGlobalWxConfig() {
 
 function setGlobalWxConfig(config) {
     if (!config || typeof config !== 'object') return null;
+    const current = getGlobalWxConfig();
+    const hasApiKey = Object.prototype.hasOwnProperty.call(config, 'apiKey');
+    const submittedApiKey = hasApiKey ? String(config.apiKey || '').trim() : '';
     globalConfig.globalWxConfig = {
         enabled: config.enabled !== false,
         apiBase: String(config.apiBase || DEFAULT_WX_CONFIG.apiBase).trim(),
-        apiKey: String(config.apiKey || '').trim(),
+        // A blank value from the settings form means "keep the existing secret".
+        apiKey: submittedApiKey || current.apiKey || '',
         proxyApiUrl: String(config.proxyApiUrl || DEFAULT_WX_CONFIG.proxyApiUrl).trim(),
         appId: String(config.appId || DEFAULT_WX_CONFIG.appId).trim(),
         autoAddAccount: config.autoAddAccount !== false,
