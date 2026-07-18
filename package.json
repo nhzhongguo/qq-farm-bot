@@ -8,9 +8,15 @@
     "dev:web": "pnpm -C web dev",
     "dev": "pnpm build:web && pnpm dev:core",
     "test": "pnpm -C core test",
-    "lint": "pnpm lint:core && pnpm lint:web",
-    "lint:core": "pnpm -C core lint",
-    "lint:web": "pnpm -C web lint",
+    "lint": "pnpm lint:check",
+    "lint:check": "pnpm lint:core:check && pnpm lint:web:check",
+    "lint:fix": "pnpm lint:core:fix && pnpm lint:web:fix",
+    "lint:core": "pnpm lint:core:check",
+    "lint:core:check": "pnpm -C core lint",
+    "lint:core:fix": "pnpm -C core lint:fix",
+    "lint:web": "pnpm lint:web:check",
+    "lint:web:check": "pnpm -C web lint",
+    "lint:web:fix": "pnpm -C web lint:fix",
     "build:web": "pnpm -C web build",
     "build": "pnpm build:web",
     "package:win": "pnpm build:web && pnpm -C core build:win",
@@ -18,6 +24,7 @@
     "package:mac": "pnpm build:web && pnpm -C core build:mac",
     "package:release": "pnpm build:web && pnpm -C core build:release",
     "install:all": "pnpm install -r",
-    "test:e2e": "pnpm -C web test:e2e"
+    "test:e2e": "pnpm -C web test:e2e",
+    "test:e2e:smoke": "pnpm -C web test:e2e e2e/auth-smoke.spec.ts"
   }
 }

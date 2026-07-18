@@ -173,15 +173,23 @@ Copy-Item .\core\data ".\backup-$stamp" -Recurse
 # 后端回归测试
 pnpm test
 
-# 自动修复并检查代码规范
-pnpm lint
+# 只读代码规范检查（不会修改工作区）
+pnpm lint:check
+
+# 需要时显式执行自动修复
+pnpm lint:fix
 
 # 前端类型检查和生产构建
 pnpm build
 
+# Playwright 认证冒烟测试（先完成 pnpm build:web）
+pnpm test:e2e:smoke
+
 # 生产依赖安全审计
 pnpm audit --prod
 ```
+
+GitHub Actions 质量门位于 `.github/workflows/ci.yml`，固定 Node.js `20.19.0` 和 pnpm `10.30.2`，使用冻结锁文件安装、只读 Lint、前端构建和 Playwright 冒烟测试。工作流仅验证代码，不包含发布、推送或密钥配置。
 
 每次正式发布至少需要满足：测试通过、Lint 通过、构建通过、依赖审计无已知漏洞、面板可以正常访问。
 

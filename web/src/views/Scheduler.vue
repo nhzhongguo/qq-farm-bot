@@ -46,7 +46,8 @@ const runtimeTaskCount = computed(() => runtimeScopes.value.reduce((total, scope
 const workerTaskCount = computed(() => workerScopes.value.reduce((total, scope) => total + scope.taskCount, 0))
 const activeTaskCount = computed(() => [...runtimeScopes.value, ...workerScopes.value]
   .flatMap(scope => scope.tasks)
-  .filter(task => task.running).length)
+  .filter(task => task.running)
+  .length)
 
 function formatDuration(milliseconds: number) {
   const seconds = Math.max(0, Math.floor(Number(milliseconds || 0) / 1000))
