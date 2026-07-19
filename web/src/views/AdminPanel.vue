@@ -674,6 +674,15 @@ function parseBrowser(userAgent: string): string {
 // ========== 系统配置 ==========
 const systemConfigSaving = ref(false)
 const systemConfigLoading = ref(false)
+const runtimeDoctorLoading = ref(false)
+const runtimeDoctorError = ref('')
+const runtimeDoctor = ref<{
+  ok: boolean
+  version: string
+  nodeVersion: string
+  checkedAt: string
+  checks: Array<{ id: string, label: string, status: 'ok' | 'error', message: string }>
+} | null>(null)
 
 const localSystemConfig = ref({
   serverUrl: 'wss://gate-obt.nqf.qq.com/prod/ws',
@@ -814,6 +823,26 @@ async function loadSystemConfig() {
   }
 }
 
+async function loadRuntimeDoctor() {
+  runtimeDoctorLoading.value = true
+  runtimeDoctorError.value = ''
+  try {
+    const { data } = await api.get('/api/admin/doctor')
+    if (data?.ok && data.data) {
+      runtimeDoctor.value = data.data
+    }
+    else {
+      runtimeDoctorError.value = String(data?.error || '无法读取运行环境状态')
+    }
+  }
+  catch (error: any) {
+    runtimeDoctorError.value = String(error?.response?.data?.error || '无法读取运行环境状态')
+  }
+  finally {
+    runtimeDoctorLoading.value = false
+  }
+}
+
 async function handleSaveSystemConfig() {
   systemConfigSaving.value = true
   try {
@@ -858,6 +887,7 @@ onMounted(() => {
   fetchUsers()
   fetchLoginLogs()
   loadSystemConfig()
+  loadRuntimeDoctor()
   loadWxConfig()
   fetchCardClaimStatus()
 })
@@ -1539,6 +1569,54 @@ onMounted(() => {
           </h3>
 
           <div class="ds-page">
+            <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 class="flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
+                    <div class="i-carbon-health-cross" />
+                    运行环境检查
+                  </h4>
+                  <p class="mt-1 text-xs text-[var(--color-text-secondary)]">
+                    检查本机数据目录、版本信息和必要资源，不会修改配置。
+                  </p>
+                </div>
+                <BaseButton variant="secondary" size="sm" :loading="runtimeDoctorLoading" @click="loadRuntimeDoctor">
+                  <div v-if="!runtimeDoctorLoading" class="i-carbon-renew" />
+                  刷新检查
+                </BaseButton>
+              </div>
+
+              <div v-if="runtimeDoctor" class="grid mt-4 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div
+                  v-for="check in runtimeDoctor.checks"
+                  :key="check.id"
+                  class="flex items-start gap-2 border px-3 py-2 text-sm"
+                  :class="check.status === 'ok'
+                    ? 'border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100'
+                    : 'border-rose-200 bg-rose-50/70 text-rose-900 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-100'"
+                >
+                  <div :class="check.status === 'ok' ? 'i-carbon-checkmark-filled text-emerald-600' : 'i-carbon-warning-filled text-rose-600'" />
+                  <div class="min-w-0">
+                    <div class="font-medium">
+                      {{ check.label }}
+                    </div>
+                    <div class="mt-0.5 text-xs opacity-80">
+                      {{ check.message }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p v-else-if="!runtimeDoctorLoading" class="mt-4 text-sm text-[var(--color-text-secondary)]">
+                尚未获取运行环境检查结果。
+              </p>
+              <p v-if="runtimeDoctorError" class="mt-3 text-sm text-[var(--color-danger)]">
+                {{ runtimeDoctorError }}
+              </p>
+              <p v-if="runtimeDoctor" class="mt-3 text-xs text-[var(--color-text-secondary)]">
+                版本 {{ runtimeDoctor.version }} · Node {{ runtimeDoctor.nodeVersion }}
+              </p>
+            </div>
+
             <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
               <h4 class="mb-3 flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
                 <div class="i-carbon-settings" />
