@@ -12,6 +12,9 @@ process.env.SESSION_ABSOLUTE_TTL_MS = '2000';
 process.env.SESSION_IDLE_TTL_MS = '2000';
 
 const { startAdminServer, stopAdminServer, resetPublicRateLimits } = require('../src/controllers/admin');
+const store = require('../src/models/store');
+const taskRunStore = require('../src/services/task-run-store');
+const userStore = require('../src/models/user-store');
 
 function request(method, pathName, { headers = {}, body } = {}) {
     return new Promise((resolve, reject) => {
@@ -200,6 +203,31 @@ test('runtime doctor is admin-only and does not expose local paths', async () =>
     assert.equal(reportRes.json?.data?.version, '2.4.0');
     assert.equal(Array.isArray(reportRes.json?.data?.checks), true);
     assert.doesNotMatch(JSON.stringify(reportRes.json), /qq-farm-http-test/);
+});
+
+test('task history is authenticated, owner-filtered, and rejects account override', async () => {
+    await waitReady();
+    const aliceCard = userStore.createCard('alice access', 1, 'time');
+    const bobCard = userStore.createCard('bob access', 1, 'time');
+    assert.equal(userStore.registerUser('history_alice', 'Alice123!', aliceCard.code).ok, true);
+    assert.equal(userStore.registerUser('history_bob', 'Bob123!', bobCard.code).ok, true);
+    store.addOrUpdateAccount({ name: 'Alice farm', username: 'history_alice' });
+    store.addOrUpdateAccount({ name: 'Bob farm', username: 'history_bob' });
+    const aliceAccount = store.getAccountsByUser('history_alice').accounts[0];
+    const bobAccount = store.getAccountsByUser('history_bob').accounts[0];
+    const aliceRun = taskRunStore.startRun({ accountId: aliceAccount.id, taskName: 'farm_check' });
+    taskRunStore.finishRun(aliceRun.id, { status: 'success' });
+    const bobRun = taskRunStore.startRun({ accountId: bobAccount.id, taskName: 'friend_help' });
+    taskRunStore.finishRun(bobRun.id, { status: 'failed', error: 'hidden failure' });
+
+    const loginRes = await request('POST', '/api/login', { body: { username: 'history_alice', password: 'Alice123!' } });
+    const token = loginRes.json?.data?.token;
+    const ownHistory = await request('GET', '/api/task-runs?limit=20', { headers: { 'x-admin-token': token } });
+    assert.equal(ownHistory.status, 200);
+    assert.deepEqual(ownHistory.json?.data?.runs.map(run => run.accountId), [String(aliceAccount.id)]);
+    assert.equal(JSON.stringify(ownHistory.json).includes('hidden failure'), false);
+    const forbidden = await request('GET', '/api/task-runs', { headers: { 'x-admin-token': token, 'x-account-id': String(bobAccount.id) } });
+    assert.equal(forbidden.status, 403);
 });
 
 test('wechat QR login stays same-origin and reports an unavailable local service', async () => {

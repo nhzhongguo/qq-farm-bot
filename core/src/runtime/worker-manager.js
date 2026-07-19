@@ -1,4 +1,5 @@
 const { createScheduler } = require('../services/scheduler');
+const { recordTaskRunEvent: persistTaskRunEvent } = require('../services/task-run-store');
 
 function createWorkerManager(options) {
     const {
@@ -20,6 +21,7 @@ function createWorkerManager(options) {
         deleteAccount,
         onStatusSync,
         onWorkerLog,
+        recordTaskRunEvent = persistTaskRunEvent,
     } = options;
     const managerScheduler = createScheduler('worker_manager');
     const useThreadRuntime = runtimeMode === 'thread' && !processRef.pkg && typeof WorkerThread === 'function';
@@ -194,7 +196,17 @@ function createWorkerManager(options) {
         const worker = workers[accountId];
         if (!worker) return;
 
-        if (msg.type === 'status_sync') {
+        if (msg.type === 'task_run') {
+            try {
+                // The IPC account identity is trusted; the worker payload is not.
+                recordTaskRunEvent(String(accountId), msg.event, msg.run);
+            } catch (error) {
+                log('错误', `账号 ${worker.name} 的任务历史写入失败: ${error && error.message ? error.message : error}`, {
+                    accountId: String(accountId),
+                    accountName: worker.name,
+                });
+            }
+        } else if (msg.type === 'status_sync') {
             // 合并状态
             worker.status = normalizeStatusForPanel(msg.data, accountId, worker.name);
             if (typeof onStatusSync === 'function') {

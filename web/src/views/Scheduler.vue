@@ -31,6 +31,18 @@ interface SchedulerSnapshot {
   schedulers: SchedulerScope[]
 }
 
+interface TaskRun {
+  id: string
+  accountId: string
+  taskName: string
+  trigger: string
+  status: 'running' | 'success' | 'failed'
+  startedAt: number
+  endedAt: number | null
+  durationMs: number | null
+  error: string | null
+}
+
 const accountStore = useAccountStore()
 const { currentAccount, currentAccountId } = storeToRefs(accountStore)
 const loading = ref(false)
@@ -38,7 +50,27 @@ const refreshedAt = ref(0)
 const runtime = ref<SchedulerSnapshot | null>(null)
 const worker = ref<SchedulerSnapshot | null>(null)
 const workerError = ref('')
+const taskRuns = ref<TaskRun[]>([])
+const historyError = ref('')
 let refreshTimer: number | undefined
+
+const taskLabels: Record<string, string> = {
+  daily_routine: '每日奖励',
+  email_check: '邮箱检查',
+  farm_check: '农场巡查',
+  fertilizer_apply: '自动施肥',
+  fertilizer_gifts: '化肥礼包',
+  friend_bad_startup: '启动捣乱',
+  friend_help: '好友帮助',
+  friend_steal: '好友偷菜',
+  task_claim: '每日任务',
+}
+
+const triggerLabels: Record<string, string> = {
+  config: '配置变更',
+  scheduler: '定时调度',
+  startup: '账号启动',
+}
 
 const runtimeScopes = computed(() => runtime.value?.schedulers || [])
 const workerScopes = computed(() => worker.value?.schedulers || [])
@@ -70,6 +102,46 @@ function formatDate(timestamp: number) {
   }).format(new Date(timestamp))
 }
 
+function formatHistoryDate(timestamp: number) {
+  if (!timestamp)
+    return '未知时间'
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(timestamp))
+}
+
+function formatRunDuration(milliseconds: number | null) {
+  if (milliseconds == null)
+    return '执行中'
+  if (milliseconds < 1000)
+    return `${milliseconds} 毫秒`
+  return formatDuration(milliseconds)
+}
+
+function getTaskLabel(taskName: string) {
+  return taskLabels[taskName] || taskName
+}
+
+function getTriggerLabel(trigger: string) {
+  return triggerLabels[trigger] || trigger
+}
+
+function getStatusLabel(status: TaskRun['status']) {
+  return status === 'success' ? '成功' : status === 'failed' ? '失败' : '执行中'
+}
+
+function getStatusClass(status: TaskRun['status']) {
+  return status === 'success'
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : status === 'failed'
+      ? 'text-red-600 dark:text-red-400'
+      : 'text-amber-600 dark:text-amber-400'
+}
+
 function formatNextRun(task: SchedulerTask) {
   if (!task.nextRunAt)
     return '等待调度'
@@ -81,22 +153,32 @@ function formatNextRun(task: SchedulerTask) {
 
 async function loadScheduler() {
   loading.value = true
-  try {
-    const response = await api.get('/api/scheduler')
-    const data = response.data?.data || {}
+  const [schedulerResult, historyResult] = await Promise.allSettled([
+    api.get('/api/scheduler'),
+    api.get('/api/task-runs', { params: { limit: 50 } }),
+  ])
+  if (schedulerResult.status === 'fulfilled') {
+    const data = schedulerResult.value.data?.data || {}
     runtime.value = data.runtime || null
     worker.value = data.worker || null
     workerError.value = String(data.workerError || '')
-    refreshedAt.value = Date.now()
   }
-  catch {
+  else {
     runtime.value = null
     worker.value = null
     workerError.value = '暂时无法读取调度状态'
   }
-  finally {
-    loading.value = false
+  if (historyResult.status === 'fulfilled') {
+    const runs = historyResult.value.data?.data?.runs
+    taskRuns.value = Array.isArray(runs) ? runs : []
+    historyError.value = ''
   }
+  else {
+    taskRuns.value = []
+    historyError.value = '暂时无法读取执行历史'
+  }
+  refreshedAt.value = Date.now()
+  loading.value = false
 }
 
 watch(currentAccountId, () => {
@@ -191,6 +273,41 @@ onUnmounted(() => {
             <div><span class="text-[var(--color-text-secondary)] md:hidden">下次：</span>{{ formatNextRun(task) }}</div>
             <div><span class="text-[var(--color-text-secondary)] md:hidden">上次：</span>{{ formatDate(task.lastRunAt) }}</div>
             <div><span class="text-[var(--color-text-secondary)] md:hidden">次数：</span>{{ task.runCount }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="space-y-3">
+      <div class="flex items-center gap-2">
+        <div class="i-carbon-time text-lg text-[var(--theme-primary)]" />
+        <h2 class="text-base font-semibold">最近执行</h2>
+      </div>
+
+      <div v-if="historyError" class="border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+        {{ historyError }}
+      </div>
+      <div v-else-if="!loading && !taskRuns.length" class="ds-surface">
+        <EmptyState icon="i-carbon-time" title="暂无执行记录" description="账号任务完成后，成功和失败结果会保留在这里。" />
+      </div>
+      <div v-else-if="taskRuns.length" class="ds-surface overflow-hidden">
+        <div class="hidden grid-cols-[minmax(0,1.3fr)_minmax(7rem,0.8fr)_minmax(5rem,0.55fr)_minmax(9rem,0.9fr)_minmax(6rem,0.6fr)] gap-3 border-b border-[var(--color-border-default)] px-4 py-2 text-xs font-medium text-[var(--color-text-secondary)] md:grid">
+          <span>任务</span>
+          <span>触发方式</span>
+          <span>状态</span>
+          <span>开始时间</span>
+          <span>耗时</span>
+        </div>
+        <div class="divide-y divide-[var(--color-border-default)]">
+          <div v-for="run in taskRuns" :key="run.id" class="grid gap-2 px-4 py-3 text-sm md:grid-cols-[minmax(0,1.3fr)_minmax(7rem,0.8fr)_minmax(5rem,0.55fr)_minmax(9rem,0.9fr)_minmax(6rem,0.6fr)] md:gap-3">
+            <div class="min-w-0">
+              <div class="truncate font-medium" :title="getTaskLabel(run.taskName)">{{ getTaskLabel(run.taskName) }}</div>
+              <div v-if="run.error" class="mt-1 break-words text-xs text-red-600 dark:text-red-400" :title="run.error">{{ run.error }}</div>
+            </div>
+            <div><span class="text-[var(--color-text-secondary)] md:hidden">触发：</span>{{ getTriggerLabel(run.trigger) }}</div>
+            <div><span class="text-[var(--color-text-secondary)] md:hidden">状态：</span><span class="font-medium" :class="getStatusClass(run.status)">{{ getStatusLabel(run.status) }}</span></div>
+            <div><span class="text-[var(--color-text-secondary)] md:hidden">开始：</span>{{ formatHistoryDate(run.startedAt) }}</div>
+            <div><span class="text-[var(--color-text-secondary)] md:hidden">耗时：</span>{{ formatRunDuration(run.durationMs) }}</div>
           </div>
         </div>
       </div>

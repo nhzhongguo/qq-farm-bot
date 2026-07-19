@@ -16,7 +16,7 @@
     "build:mac": "pkg . --no-bytecode --targets node18-macos-x64,node18-macos-arm64 --out-path dist",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "node --test test/data-safety.test.js test/http-security.test.js test/wx-login-client.test.js test/wx-login-session.test.js test/ci-quality-gate.test.js test/release-contract.test.js test/runtime-doctor.test.js"
+    "test": "node --test test/data-safety.test.js test/http-security.test.js test/task-run-store.test.js test/worker-manager-task-run.test.js test/wx-login-client.test.js test/wx-login-session.test.js test/ci-quality-gate.test.js test/release-contract.test.js test/runtime-doctor.test.js"
   },
   "dependencies": {
     "axios": "^1.18.1",

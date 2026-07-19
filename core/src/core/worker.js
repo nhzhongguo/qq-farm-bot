@@ -16,6 +16,7 @@ const { autoBuyFertilizer, checkAndBuyFertilizerBoth, buyFreeGifts, getFreeGiftD
 const { performDailyMonthCardGift, getMonthCardDailyState } = require('../services/monthcard');
 const { performDailyVipGift, getVipDailyState } = require('../services/qqvip');
 const { createScheduler, getSchedulerRegistrySnapshot } = require('../services/scheduler');
+const { createTaskRunReporter } = require('../services/task-run-reporter');
 const { performDailyShare, getShareDailyState } = require('../services/share');
 const { resetSessionGains, recordOperation, initStatsWithPersistence, saveStats } = require('../services/stats');
 const { initStatusBar, setStatusPlatform, statusData } = require('../services/status');
@@ -39,6 +40,11 @@ function sendToMaster(payload) {
         parentPort.postMessage(payload);
     }
 }
+
+const taskRunReporter = createTaskRunReporter({
+    accountId: process.env.FARM_ACCOUNT_ID || '',
+    send: sendToMaster,
+});
 
 function onMasterMessage(handler) {
     if (process.send) {
@@ -127,15 +133,17 @@ function getLocalDateKey() {
     return `${y}-${m}-${d}`;
 }
 
-async function runDailyRoutines(force = false) {
+async function runDailyRoutines(force = false, trigger = 'scheduler') {
     if (!loginReady) return;
     try {
-        // 以下功能默认启用，不再检查开关
-        await checkAndClaimEmails(force);
-        await performDailyShare(force);
-        await performDailyMonthCardGift(force);
-        await buyFreeGifts(force);
-        await performDailyVipGift(force);
+        await taskRunReporter.run('daily_routine', trigger, async () => {
+            // 以下功能默认启用，不再检查开关
+            await checkAndClaimEmails(force);
+            await performDailyShare(force);
+            await performDailyMonthCardGift(force);
+            await buyFreeGifts(force);
+            await performDailyVipGift(force);
+        });
     } catch (e) {
         log('系统', `每日任务调度失败: ${e.message}`, { module: 'system', event: '每日任务', result: 'error' });
     }
@@ -149,7 +157,7 @@ function startDailyRoutineTimer() {
     stopDailyRoutineTimer();
     lastDailyRunDate = getLocalDateKey();
     // 新账号登录后按当前设置强制执行一次领取
-    runDailyRoutines(true).catch(() => null);
+    runDailyRoutines(true, 'startup').catch(() => null);
     workerScheduler.setIntervalTask('daily_routine_interval', 30 * 1000, () => {
         if (!loginReady) return;
         const today = getLocalDateKey();
@@ -221,10 +229,10 @@ async function runFarmTick(auto) {
         CONFIG.farmCheckIntervalMax || CONFIG.farmCheckInterval || 2000
     );
     try {
-        if (auto.farm) await checkFarm();
-        if (auto.task) await checkAndClaimTasks();
-        if (auto.email) await checkAndClaimEmails();
-        if (auto.fertilizer_gift) await openFertilizerGiftPacksSilently();
+        if (auto.farm) await taskRunReporter.run('farm_check', 'scheduler', checkFarm);
+        if (auto.task) await taskRunReporter.run('task_claim', 'scheduler', checkAndClaimTasks);
+        if (auto.email) await taskRunReporter.run('email_check', 'scheduler', checkAndClaimEmails);
+        if (auto.fertilizer_gift) await taskRunReporter.run('fertilizer_gifts', 'scheduler', openFertilizerGiftPacksSilently);
     } catch {
         // ignore
     } finally {
@@ -262,7 +270,7 @@ async function runHelpTick(auto) {
     );
     //log('系统', `帮助巡查开始执行，下次间隔 ${helpMs}ms`, { module: 'system', event: '帮助巡查', result: 'start', intervalMs: helpMs });
     try {
-        await checkFriends({ onlyHelp: true });
+        await taskRunReporter.run('friend_help', 'scheduler', () => checkFriends({ onlyHelp: true }));
     } catch (e) {
         log('系统', `帮助巡查执行失败: ${e.message}`, { module: 'system', event: '帮助巡查', result: 'error' });
     } finally {
@@ -291,7 +299,7 @@ async function runStealTick(auto) {
         CONFIG.stealCheckIntervalMax || 10000
     );
     try {
-        await checkFriends({ onlySteal: true });
+        await taskRunReporter.run('friend_steal', 'scheduler', () => checkFriends({ onlySteal: true }));
     } catch (e) {
         log('系统', `偷菜巡查执行失败: ${e.message}`, { module: 'system', event: '偷菜巡查', result: 'error' });
     } finally {
@@ -382,7 +390,7 @@ function applyRuntimeConfig(snapshot, syncNow = false) {
             if (!wasEnabled && nowEnabled) {
                 // 保存设置时 /api/automation 可能触发多次 config_sync，这里做防抖且仅关->开触发
                 workerScheduler.setTimeoutTask('daily_routine_immediate', 400, () => {
-                    runDailyRoutines(true).catch(() => null);
+                    runDailyRoutines(true, 'config').catch(() => null);
                 });
             }
 
@@ -396,7 +404,7 @@ function applyRuntimeConfig(snapshot, syncNow = false) {
                     if (!loginReady) return;
                     try {
                         // await runFertilizerByConfig([]);
-                        await runFertilizerByConfig([], { skipNormal: true });
+                        await taskRunReporter.run('fertilizer_apply', 'config', () => runFertilizerByConfig([], { skipNormal: true }));
                     } catch (e) {
                         log('施肥', `保存配置后立即施肥失败: ${e.message}`, {
                             module: 'farm',
@@ -527,13 +535,13 @@ async function startBot(config) {
         // 登录成功后启动各模块
         await processInviteCodes();
         if (getAutomation().fertilizer_gift) {
-            await openFertilizerGiftPacksSilently().catch(() => 0);
+            await taskRunReporter.run('fertilizer_gifts', 'startup', openFertilizerGiftPacksSilently).catch(() => 0);
         }
         
         // 启动时执行一次放虫放草（只在账号启动时执行）
         workerScheduler.setTimeoutTask('bad_startup_once', 10000, async () => {
             try {
-                await runBadOnceOnStartup();
+                await taskRunReporter.run('friend_bad_startup', 'startup', runBadOnceOnStartup);
             } catch (e) {
                 log('好友', `启动时放虫放草执行失败: ${e.message}`, { module: 'friend', event: '启动放虫放草失败', error: e.message });
             }

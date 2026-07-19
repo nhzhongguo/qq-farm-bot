@@ -19,6 +19,7 @@ const { findAccountByRef, normalizeAccountRef, resolveAccountId } = require('../
 const { createModuleLogger } = require('../services/logger');
 const { MiniProgramLoginSession } = require('../services/qrlogin');
 const { getSchedulerRegistrySnapshot } = require('../services/scheduler');
+const taskRunStore = require('../services/task-run-store');
 const { WxLoginClient, WxLoginClientError } = require('../services/wx-login-client');
 const { WxLoginSessionError, wxLoginSessionManager } = require('../services/wx-login-session');
 const userStore = require('../models/user-store');
@@ -1809,6 +1810,25 @@ function startAdminServer(dataProvider) {
             });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    app.get('/api/task-runs', (req, res) => {
+        try {
+            const requestedAccountId = getAccId(req);
+            if (requestedAccountId && !checkAccountAccess(req, requestedAccountId)) {
+                return res.status(403).json({ ok: false, error: '无权访问此账号' });
+            }
+            const accountIds = requestedAccountId ? [requestedAccountId] : getAccessibleAccountIds(req);
+            const runs = taskRunStore.listRuns({
+                accountIds,
+                limit: req.query.limit,
+                status: req.query.status,
+                taskName: req.query.taskName,
+            });
+            return res.json({ ok: true, data: { schemaVersion: taskRunStore.SCHEMA_VERSION, runs } });
+        } catch (error) {
+            return handleApiError(res, error);
         }
     });
 
