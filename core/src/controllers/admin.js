@@ -12,7 +12,7 @@ const { Server: SocketIOServer } = require('socket.io');
 const { version } = require('../../package.json');
 const { CONFIG, updateRuntimeConfig, getRuntimeConfig, getDefaultSystemConfig } = require('../config/config');
 const { getLevelExpProgress } = require('../config/gameConfig');
-const { getResourcePath } = require('../config/runtime-paths');
+const { getDataDir, getResourcePath } = require('../config/runtime-paths');
 const store = require('../models/store');
 const { addOrUpdateAccount, deleteAccount } = store;
 const { findAccountByRef, normalizeAccountRef, resolveAccountId } = require('../services/account-resolver');
@@ -23,6 +23,7 @@ const { WxLoginClient, WxLoginClientError } = require('../services/wx-login-clie
 const { WxLoginSessionError, wxLoginSessionManager } = require('../services/wx-login-session');
 const userStore = require('../models/user-store');
 const { rateLimitMiddleware, resetRateLimitStore } = require('../services/security');
+const { createRuntimeDoctor } = require('../services/runtime-doctor');
 
 const adminLogger = createModuleLogger('admin');
 
@@ -1809,6 +1810,19 @@ function startAdminServer(dataProvider) {
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }
+    });
+
+    app.get('/api/admin/doctor', authRequired, adminRequired, (req, res) => {
+        const doctor = createRuntimeDoctor({
+            dataDir: getDataDir(),
+            versionManifestPath: path.resolve(__dirname, '../../..', 'version.json'),
+            requiredResources: [
+                { id: 'plant-config', label: '植物配置', path: getResourcePath('gameConfig', 'Plant.json') },
+                { id: 'item-config', label: '物品配置', path: getResourcePath('gameConfig', 'ItemInfo.json') },
+                { id: 'core-proto', label: '核心协议', path: getResourcePath('proto', 'corepb.proto') },
+            ],
+        });
+        res.json({ ok: true, data: doctor.check() });
     });
 
     // 保存系统配置

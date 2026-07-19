@@ -2,7 +2,7 @@
 
 QQ农场智能助手是一套持续维护的多账号自动化管理系统，由 Node.js 后端、Vue Web 面板和独立账号 Worker 组成。项目面向长期运行场景，重点处理账号隔离、自动化任务、实时状态、运行日志、数据安全和版本回退。
 
-当前稳定版本：`v2.3.2`
+当前开发版本：`v2.4.0`
 
 仓库地址：<https://github.com/nhzhongguo/qq-farm-automation-bot-private>
 
@@ -144,6 +144,8 @@ docker compose up -d --build
 | `WX_PROXY_APP_ID` | 内置 App ID | 微信小程序 App ID |
 
 服务地址、游戏版本、平台和系统类型也可以在后台管理页面中修改。
+
+根目录 `version.json` 提供机器可读的版本、构建日期与升级摘要；后台“系统”页会显示当前运行环境检查结果。
 
 ## 数据目录与备份
 

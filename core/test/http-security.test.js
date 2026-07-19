@@ -181,6 +181,27 @@ test('expired management sessions are rejected and removed', async () => {
     assert.equal(expired.json?.ok, false);
 });
 
+test('runtime doctor is admin-only and does not expose local paths', async () => {
+    await waitReady();
+
+    const unauthenticated = await request('GET', '/api/admin/doctor');
+    assert.equal(unauthenticated.status, 401);
+
+    const loginRes = await request('POST', '/api/login', {
+        body: { username: 'admin', password: 'Admin123!' },
+    });
+    const token = loginRes.json?.data?.token;
+    const reportRes = await request('GET', '/api/admin/doctor', {
+        headers: { 'x-admin-token': token },
+    });
+
+    assert.equal(reportRes.status, 200);
+    assert.equal(reportRes.json?.ok, true);
+    assert.equal(reportRes.json?.data?.version, '2.4.0');
+    assert.equal(Array.isArray(reportRes.json?.data?.checks), true);
+    assert.doesNotMatch(JSON.stringify(reportRes.json), /qq-farm-http-test/);
+});
+
 test('wechat QR login stays same-origin and reports an unavailable local service', async () => {
     await waitReady();
 
