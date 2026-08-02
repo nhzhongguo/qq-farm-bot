@@ -5,6 +5,7 @@ node_modules/
 web/dist/
 web/stats.html
 core/dist/
+*.tsbuildinfo
 
 # Runtime data and logs
 core/data/
@@ -20,6 +21,12 @@ core/data/
 .vscode/
 .DS_Store
 Thumbs.db
+*.iml
+*.swp
+
+# AI agent worktrees and temp dirs
+.codex/
+.agent/
 
 # Playwright
 web/test-results/
