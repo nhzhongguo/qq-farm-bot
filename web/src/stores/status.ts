@@ -76,13 +76,24 @@ export const useStatusStore = defineStore('status', () => {
     }
   }
 
+  // 兼容服务端 200ms 批量合并推送：payload 可能为单条对象或批量数组
   function handleRealtimeLog(payload: any) {
     if (!realtimeLogsEnabled.value)
       return
+    if (Array.isArray(payload)) {
+      for (const entry of payload)
+        pushRealtimeLog(entry)
+      return
+    }
     pushRealtimeLog(payload)
   }
 
   function handleRealtimeAccountLog(payload: any) {
+    if (Array.isArray(payload)) {
+      for (const entry of payload)
+        pushRealtimeAccountLog(entry)
+      return
+    }
     pushRealtimeAccountLog(payload)
   }
 

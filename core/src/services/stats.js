@@ -7,6 +7,67 @@ function getStatsFilePath(accountId) {
     return path.join(dataDir, 'stats', `${accountId}.json`);
 }
 
+function getHistoryFilePath(accountId) {
+    const dataDir = process.env.FARM_DATA_DIR || path.join(__dirname, '../../data');
+    return path.join(dataDir, 'stats', `history-${accountId}.json`);
+}
+
+function loadDailyHistory(accountId) {
+    try {
+        const filePath = getHistoryFilePath(accountId);
+        if (!fs.existsSync(filePath)) return [];
+        const raw = fs.readFileSync(filePath, 'utf8');
+        if (!raw || !raw.trim()) return [];
+        const history = JSON.parse(raw);
+        return Array.isArray(history.daily) ? history.daily : [];
+    } catch {
+        return [];
+    }
+}
+
+// 将某天的统计快照归档到历史（同一天覆盖，保留最近 90 天）
+function archiveDailySnapshot(accountId, data) {
+    try {
+        const daily = loadDailyHistory(accountId);
+        const idx = daily.findIndex(d => d.date === data.date);
+        if (idx >= 0) {
+            daily[idx] = data;
+        } else {
+            daily.push(data);
+        }
+        const trimmed = daily.slice(-90);
+        const filePath = getHistoryFilePath(accountId);
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+        fs.writeFileSync(tmpPath, JSON.stringify({ daily: trimmed }, null, 2), 'utf8');
+        fs.renameSync(tmpPath, filePath);
+    } catch {
+        // ignore
+    }
+}
+
+// 收益趋势：返回最近 N 天的每日快照（含相对前一天的增量）
+function getStatsTrend(accountId, days = 30) {
+    const daily = loadDailyHistory(accountId).slice(-Math.max(1, Math.min(days, 90)));
+    return daily.map((d, i) => {
+        const prev = daily[i - 1];
+        const gold = Number(d.gold) || 0;
+        const exp = Number(d.exp) || 0;
+        return {
+            date: d.date,
+            gold,
+            exp,
+            goldGained: prev ? Math.max(0, gold - (Number(prev.gold) || 0)) : gold,
+            expGained: prev ? Math.max(0, exp - (Number(prev.exp) || 0)) : exp,
+            operations: d.operations || {},
+            savedAt: d.savedAt || 0,
+        };
+    });
+}
+
 function getTodayKey() {
     const now = new Date();
     const y = now.getFullYear();
@@ -120,9 +181,13 @@ function doSave() {
         date: todayKey,
         operations: { ...operations },
         initialState: { ...initialState },
+        gold: lastState.gold >= 0 ? lastState.gold : null,
+        exp: lastState.exp >= 0 ? lastState.exp : null,
         savedAt: Date.now(),
     };
     savePersistedStats(currentAccountId, data);
+    // 同步归档到每日历史，供趋势曲线使用
+    archiveDailySnapshot(currentAccountId, data);
 }
 
 function initStats(gold, exp, coupon = 0) {
@@ -151,6 +216,17 @@ function initStatsWithPersistence(accountId, gold, exp, coupon = 0) {
         });
         console.warn(`[统计] 已恢复今日统计数据: ${JSON.stringify(saved.operations)}`);
     } else {
+        if (saved && saved.date) {
+            console.warn(`[统计] 日期已变更，归档昨日数据 (${saved.date} -> ${todayKey})`);
+            archiveDailySnapshot(accountId, {
+                date: saved.date,
+                operations: saved.operations || {},
+                initialState: saved.initialState || {},
+                gold: saved.gold !== undefined ? saved.gold : (saved.initialState && saved.initialState.gold !== undefined ? saved.initialState.gold : null),
+                exp: saved.exp !== undefined ? saved.exp : (saved.initialState && saved.initialState.exp !== undefined ? saved.initialState.exp : null),
+                savedAt: saved.savedAt || Date.now(),
+            });
+        }
         Object.keys(operations).forEach((key) => {
             operations[key] = 0;
         });
@@ -277,4 +353,8 @@ module.exports = {
     getTodayKey,
     loadPersistedStats,
     checkAndResetDailyStats,
+    getStatsTrend,
+    getHistoryFilePath,
+    loadDailyHistory,
+    archiveDailySnapshot,
 };

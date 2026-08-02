@@ -72,28 +72,66 @@ function emitRealtimeStatus(accountId, status) {
     io.to(`account:${id}`).emit('status:update', { accountId: id, status });
 }
 
-function emitRealtimeLog(entry) {
+// ============ WebSocket 推送节流 ============
+// 账号日志/系统日志高频产生时，按账号 200ms 合并为批量推送，减少 UI 渲染压力。
+// 前端同时兼容"单条对象"与"批量数组"两种 payload。
+const LOG_BATCH_WINDOW_MS = 200;
+const logBatchQueues = new Map(); // `${channel}:${accountId}` -> { timer, entries }
+
+function flushLogBatch(key) {
+    const q = logBatchQueues.get(key);
+    if (!q) return;
+    if (q.timer) {
+        clearTimeout(q.timer);
+        q.timer = null;
+    }
+    const batch = q.entries.splice(0, q.entries.length);
+    logBatchQueues.delete(key);
+    if (!batch.length) return;
+    const separator = key.indexOf(':');
+    const channel = key.slice(0, separator);
+    const accountId = key.slice(separator + 1);
+    if (channel === 'log') {
+        io.to(`account:${accountId}`).emit('log:new', batch);
+    } else if (channel === 'account-log') {
+        io.to(`account:${accountId}`).emit('account-log:new', batch);
+    }
+}
+
+function enqueueRealtimeBatch(channel, accountId, entry) {
     if (!io) return;
+    const key = `${channel}:${accountId}`;
+    let q = logBatchQueues.get(key);
+    if (!q) {
+        q = { timer: null, entries: [] };
+        logBatchQueues.set(key, q);
+    }
+    q.entries.push(entry);
+    if (q.timer) return;
+    q.timer = setTimeout(() => {
+        q.timer = null;
+        flushLogBatch(key);
+    }, LOG_BATCH_WINDOW_MS);
+}
+
+function emitRealtimeLog(entry) {
     const payload = (entry && typeof entry === 'object') ? entry : {};
     const id = String(payload.accountId || '').trim();
 
     // 如果没有指定账号ID，不推送给任何人（防止数据泄露）
     if (!id) return;
 
-    // 推送到特定账号房间（只有订阅了该账号的用户能收到）
-    io.to(`account:${id}`).emit('log:new', payload);
+    enqueueRealtimeBatch('log', id, payload);
 }
 
 function emitRealtimeAccountLog(entry) {
-    if (!io) return;
     const payload = (entry && typeof entry === 'object') ? entry : {};
     const id = String(payload.accountId || '').trim();
 
     // 如果没有指定账号ID，不推送给任何人（防止数据泄露）
     if (!id) return;
 
-    // 推送到特定账号房间（只有订阅了该账号的用户能收到）
-    io.to(`account:${id}`).emit('account-log:new', payload);
+    enqueueRealtimeBatch('account-log', id, payload);
 }
 
 function startAdminServer(dataProvider) {
@@ -1683,6 +1721,25 @@ function startAdminServer(dataProvider) {
             const { getPlantRankings } = require('../services/analytics');
             const data = getPlantRankings(sortBy);
             res.json({ ok: true, data });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // API: 收益趋势（金币/经验/操作数 7/30/90 天）
+    app.get('/api/stats/trend', async (req, res) => {
+        const id = getAccId(req);
+        if (!id) {
+            return res.status(400).json({ ok: false, error: 'Missing x-account-id' });
+        }
+        if (!checkAccountAccess(req, id)) {
+            return res.status(403).json({ ok: false, error: '无权访问此账号' });
+        }
+        try {
+            const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 90);
+            const { getStatsTrend } = require('../services/stats');
+            const points = getStatsTrend(id, days);
+            res.json({ ok: true, data: { accountId: id, days, points } });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }

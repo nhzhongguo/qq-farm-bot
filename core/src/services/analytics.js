@@ -34,7 +34,16 @@ function formatTime(seconds) {
     return mins > 0 ? `${hours}时${mins}分` : `${hours}时`;
 }
 
+// ============ 静态数据缓存 ============
+// 作物排名计算基于静态配置，5 分钟内结果不变，缓存避免重复解析与计算
+const RANKING_CACHE_TTL_MS = 5 * 60 * 1000;
+const rankingCache = new Map(); // sortBy -> { timestamp, data }
+
 function getPlantRankings(sortBy = 'exp') {
+    const cached = rankingCache.get(sortBy);
+    if (cached && Date.now() - cached.timestamp < RANKING_CACHE_TTL_MS) {
+        return cached.data;
+    }
     const plants = getAllPlants();
     
     // 筛选普通作物
@@ -115,9 +124,16 @@ function getPlantRankings(sortBy = 'exp') {
         results.sort((a, b) => lv(b.level) - lv(a.level));
     }
 
+    rankingCache.set(sortBy, { timestamp: Date.now(), data: results });
     return results;
+}
+
+// 仅测试用：清空排名缓存，验证缓存逻辑
+function __clearRankingCacheForTest() {
+    rankingCache.clear();
 }
 
 module.exports = {
     getPlantRankings,
+    __clearRankingCacheForTest,
 };

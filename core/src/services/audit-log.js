@@ -1,6 +1,6 @@
 const crypto = require('node:crypto');
 const { getDataFile } = require('../config/runtime-paths');
-const { readJsonFile, writeJsonFileAtomic } = require('./json-db');
+const { readJsonFile, writeJsonFileAtomic, createDebouncedWriter, flushWritersFor } = require('./json-db');
 
 const SCHEMA_VERSION = 1;
 const DEFAULT_RETENTION_DAYS = 90;
@@ -61,6 +61,15 @@ function createAuditLog(options = {}) {
         return retained;
     }
 
+    // 批量合并写入：审计日志高频追加时合并为一次原子写（默认 300ms 窗口）
+    const pendingEntries = [];
+    const writer = createDebouncedWriter(() => {
+        if (pendingEntries.length === 0) return;
+        const batch = pendingEntries.splice(0, pendingEntries.length);
+        persist([...batch, ...readEntries()]);
+    }, 300, filePath);
+    const FLUSH_THRESHOLD = 50; // 达到阈值立即落盘，避免内存无界增长
+
     /**
      * 记录一条操作审计日志
      * @param {object} params
@@ -82,11 +91,18 @@ function createAuditLog(options = {}) {
             ip: String(ip || '').trim(),
             severity,
         };
-        persist([entry, ...readEntries()]);
+        pendingEntries.push(entry);
+        if (pendingEntries.length >= FLUSH_THRESHOLD) {
+            writer.flush();
+        } else {
+            writer.schedule();
+        }
         return entry;
     }
 
     function list(filters = {}) {
+        // 读取前先落盘（含其他实例的 pending 写入），保证查询到最新数据
+        flushWritersFor(filePath);
         const entries = retain(readEntries());
         const actor = String(filters.actor || '').trim();
         const action = String(filters.action || '').trim();

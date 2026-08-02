@@ -1,6 +1,6 @@
 const fs = require('fs');
 const { getDataFile, ensureDataDir } = require('../config/runtime-paths');
-const { writeJsonFileAtomic, writeTextFileAtomic } = require('../services/json-db');
+const { writeJsonFileAtomic, writeTextFileAtomic, createDebouncedWriter, flushWritersFor } = require('../services/json-db');
 const crypto = require('crypto');
 
 const USERS_FILE = getDataFile('users.json');
@@ -119,11 +119,19 @@ function addLoginLog(entry) {
     if (loginLogs.length > 1000) {
         loginLogs = loginLogs.slice(-1000);
     }
-    saveLoginLogs();
+    // 登录日志为高频追加型数据，合并写入减少同步 IO
+    loginLogsWriter.schedule();
     return logEntry;
 }
 
+// 登录日志合并写入器（500ms 窗口）
+const loginLogsWriter = createDebouncedWriter(() => {
+    saveLoginLogs();
+}, 500, LOGIN_LOGS_FILE);
+
 function getLoginLogs(limit = 100, offset = 0) {
+    // 读取前先落盘，保证读到最新记录
+    flushWritersFor(LOGIN_LOGS_FILE);
     loadLoginLogs();
     const sorted = [...loginLogs].sort((a, b) => b.timestamp - a.timestamp);
     return {
@@ -133,6 +141,7 @@ function getLoginLogs(limit = 100, offset = 0) {
 }
 
 function clearLoginLogs() {
+    flushWritersFor(LOGIN_LOGS_FILE);
     loginLogs = [];
     saveLoginLogs();
     return { ok: true };
@@ -1090,10 +1099,18 @@ function addCardLog(entry) {
     if (cardLogs.length > 5000) {
         cardLogs = cardLogs.slice(cardLogs.length - 5000);
     }
-    saveCardLogs();
+    // 卡密流水为追加型数据，合并写入减少同步 IO
+    cardLogsWriter.schedule();
 }
 
+// 卡密流水合并写入器（500ms 窗口）
+const cardLogsWriter = createDebouncedWriter(() => {
+    saveCardLogs();
+}, 500, CARD_LOGS_FILE);
+
 function getCardLogs(limit = 200, offset = 0, action = null) {
+    // 读取前先落盘，保证读到最新记录
+    flushWritersFor(CARD_LOGS_FILE);
     loadCardLogs();
     const filtered = action ? cardLogs.filter(l => l.action === action) : cardLogs;
     const sorted = [...filtered].sort((a, b) => (b.at || 0) - (a.at || 0));
@@ -1104,6 +1121,7 @@ function getCardLogs(limit = 200, offset = 0, action = null) {
 }
 
 function clearCardLogs() {
+    flushWritersFor(CARD_LOGS_FILE);
     loadCardLogs();
     const count = cardLogs.length;
     cardLogs = [];

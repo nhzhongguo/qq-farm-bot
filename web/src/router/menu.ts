@@ -37,6 +37,13 @@ export const menuRoutes: MenuItem[] = [
     component: () => import('@/views/Analytics.vue'),
   },
   {
+    path: 'statistics',
+    name: 'statistics',
+    label: '统计',
+    icon: 'i-carbon-chart-line',
+    component: () => import('@/views/Statistics.vue'),
+  },
+  {
     path: 'scheduler',
     name: 'scheduler',
     label: '调度',
