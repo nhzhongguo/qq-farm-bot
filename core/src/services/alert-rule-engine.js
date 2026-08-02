@@ -12,11 +12,36 @@ const CONDITION_TYPES = {
     task_error_count: '任务错误总数',
 };
 
-// 告警通道类型
+// 告警通道类型（webhook / 系统日志 / pushoo 全渠道）
 const CHANNEL_TYPES = {
     webhook: 'Webhook',
     log: '系统日志',
+    qmsg: 'Qmsg',
+    serverchan: 'Server酱',
+    pushplus: 'PushPlus',
+    pushplushxtrip: 'PushPlus(葫芦侠)',
+    dingtalk: '钉钉',
+    wecom: '企业微信',
+    bark: 'Bark',
+    gocqhttp: 'GoCQHTTP',
+    onebot: 'OneBot',
+    atri: 'Atri',
+    pushdeer: 'PushDeer',
+    igot: 'iGot',
+    telegram: 'Telegram',
+    feishu: '飞书',
+    ifttt: 'IFTTT',
+    wecombot: '企业微信机器人',
+    discord: 'Discord',
+    wxpusher: 'WxPusher',
 };
+
+// 需要 token 的推送渠道（webhook 使用 endpoint，log 不需要 token）
+const CHANNELS_NEEDING_TOKEN = new Set([
+    'qmsg', 'serverchan', 'pushplus', 'pushplushxtrip', 'dingtalk', 'wecom',
+    'bark', 'gocqhttp', 'onebot', 'atri', 'pushdeer', 'igot', 'telegram',
+    'feishu', 'ifttt', 'wecombot', 'discord', 'wxpusher',
+]);
 
 function createAlertRuleEngine(options = {}) {
     const filePath = options.filePath || getDataFile('alert_rules.json');
@@ -35,7 +60,7 @@ function createAlertRuleEngine(options = {}) {
         writeJsonFileAtomic(filePath, { schemaVersion: SCHEMA_VERSION, rules: trimmedRules, triggers: trimmedTriggers });
     }
 
-    function createRule({ name, description, condition, threshold, channel, endpoint, username }) {
+    function createRule({ name, description, condition, threshold, channel, endpoint, token, username }) {
         const trimmedName = String(name || '').trim();
         if (!trimmedName) throw new Error('规则名称不能为空');
         if (!CONDITION_TYPES[condition]) throw new Error(`不支持的条件类型: ${condition}`);
@@ -53,6 +78,7 @@ function createAlertRuleEngine(options = {}) {
             threshold: numThreshold,
             channel,
             endpoint: channel === 'webhook' ? String(endpoint || '').trim() : '',
+            token: CHANNELS_NEEDING_TOKEN.has(channel) ? String(token || '').trim() : '',
             username: String(username || '').trim(),
             enabled: existing >= 0 ? rules[existing].enabled : true,
             createdAt: existing >= 0 ? rules[existing].createdAt : now(),
@@ -104,9 +130,10 @@ function createAlertRuleEngine(options = {}) {
      * @param {number} [context.consecutiveFailures] - 连续失败次数
      * @param {number} [context.offlineDurationSec] - 离线时长（秒）
      * @param {number} [context.taskErrorCount] - 任务错误总数
+     * @param {Function} [deliver] - 可选的投递回调：async (trigger, rule) => {}，用于向外部渠道推送
      * @returns {Array} 触发的告警列表
      */
-    function evaluate(context) {
+    function evaluate(context, deliver) {
         const { rules, triggers } = readRules();
         const triggered = [];
 
@@ -142,6 +169,13 @@ function createAlertRuleEngine(options = {}) {
                 };
                 triggered.push(trigger);
                 triggers.push(trigger);
+
+                // 非 log 通道且提供投递回调时，尝试外部推送（异步，不阻塞评估）
+                if (rule.channel !== 'log' && typeof deliver === 'function') {
+                    try {
+                        deliver(trigger, rule).catch(() => { /* 推送失败不影响评估结果 */ });
+                    } catch { /* ignore */ }
+                }
             }
         }
 

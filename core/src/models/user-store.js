@@ -8,11 +8,13 @@ const CARDS_FILE = getDataFile('cards.json');
 const LOGIN_ATTEMPTS_FILE = getDataFile('login-attempts.json');
 const LOGIN_LOGS_FILE = getDataFile('login-logs.json');
 const CARD_CLAIM_FILE = getDataFile('card-claim.json');
+const CARD_LOGS_FILE = getDataFile('card-logs.json');
 
 const DEFAULT_ACCOUNT_LIMIT = 2;
 
 let cardClaimEnabled = false;
 let cardClaimRecords = [];
+let cardLogs = [];
 
 const SALT_LENGTH = 32;
 const ITERATIONS = 100000;
@@ -559,6 +561,15 @@ function registerUser(username, password, cardCode) {
     
     clearFailedAttempts(username);
 
+    addCardLog({
+        action: 'register',
+        username: newUser.username,
+        cardCode: card.code,
+        cardType: cardType,
+        days: card.days,
+        at: now
+    });
+
     return { ok: true, user: { username: newUser.username, role: newUser.role, card: newUser.card, accountLimit: newUser.accountLimit } };
 }
 
@@ -638,6 +649,15 @@ function renewUser(username, cardCode) {
 
     saveUsers();
     saveCards();
+
+    addCardLog({
+        action: 'renew',
+        username,
+        cardCode: card.code,
+        cardType,
+        days: card.days,
+        at: now
+    });
 
     return { ok: true, card: user.card, accountLimit: user.accountLimit || DEFAULT_ACCOUNT_LIMIT, cardType };
 }
@@ -995,6 +1015,15 @@ function claimCardByUA(identity, username = null) {
     });
     
     saveCardClaimRecords();
+
+    addCardLog({
+        action: 'claim',
+        username: username || null,
+        cardCode: selectedCard.code,
+        cardType: 'time',
+        days: selectedCard.days,
+        at: Date.now()
+    });
     
     return {
         ok: true,
@@ -1027,6 +1056,61 @@ function clearExpiredClaimRecords() {
     return { cleared: beforeCount - cardClaimRecords.length };
 }
 
+// ============ 卡密消费流水 ============
+function loadCardLogs() {
+    try {
+        const data = readJsonWithBackup(CARD_LOGS_FILE, []);
+        cardLogs = Array.isArray(data) ? data : [];
+    } catch (e) {
+        console.error('加载卡密流水失败:', e.message);
+        cardLogs = [];
+    }
+}
+
+function saveCardLogs() {
+    try {
+        writeJsonWithBackup(CARD_LOGS_FILE, cardLogs);
+    } catch (e) {
+        console.error('保存卡密流水失败:', e.message);
+        throw e;
+    }
+}
+
+function addCardLog(entry) {
+    loadCardLogs();
+    cardLogs.push({
+        action: entry.action,        // register | renew | claim
+        username: entry.username || null,
+        cardCode: entry.cardCode,
+        cardType: entry.cardType || 'time',
+        days: entry.days,
+        at: entry.at || Date.now()
+    });
+    // 最多保留 5000 条，防止文件无限增长
+    if (cardLogs.length > 5000) {
+        cardLogs = cardLogs.slice(cardLogs.length - 5000);
+    }
+    saveCardLogs();
+}
+
+function getCardLogs(limit = 200, offset = 0, action = null) {
+    loadCardLogs();
+    const filtered = action ? cardLogs.filter(l => l.action === action) : cardLogs;
+    const sorted = [...filtered].sort((a, b) => (b.at || 0) - (a.at || 0));
+    return {
+        total: sorted.length,
+        logs: sorted.slice(offset, offset + limit)
+    };
+}
+
+function clearCardLogs() {
+    loadCardLogs();
+    const count = cardLogs.length;
+    cardLogs = [];
+    saveCardLogs();
+    return { cleared: count };
+}
+
 module.exports = {
     validateUser,
     validateUserWithoutPassword,
@@ -1052,4 +1136,7 @@ module.exports = {
     claimCardByUA,
     getCardClaimRecords,
     clearExpiredClaimRecords,
+    addCardLog,
+    getCardLogs,
+    clearCardLogs,
 };

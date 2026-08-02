@@ -14,8 +14,8 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore()
 const toast = useToastStore()
 
-const activeTab = ref<'card' | 'user' | 'log' | 'audit' | 'alert' | 'system'>(
-  (localStorage.getItem('admin-active-tab') as 'card' | 'user' | 'log' | 'audit' | 'alert' | 'system') || 'card',
+const activeTab = ref<'card' | 'user' | 'log' | 'audit' | 'alert' | 'announcement' | 'system'>(
+  (localStorage.getItem('admin-active-tab') as 'card' | 'user' | 'log' | 'audit' | 'alert' | 'announcement' | 'system') || 'card',
 )
 
 watch(activeTab, (newTab) => {
@@ -28,6 +28,7 @@ const tabs = [
   { key: 'log', label: '日志', icon: 'i-carbon-document' },
   { key: 'audit', label: '审计', icon: 'i-carbon-task-approved' },
   { key: 'alert', label: '告警', icon: 'i-carbon-warning-alt' },
+  { key: 'announcement', label: '公告', icon: 'i-carbon-megaphone' },
   { key: 'system', label: '系统', icon: 'i-carbon-settings' },
 ] as const
 
@@ -71,6 +72,66 @@ const cardTypeFilter = ref<'all' | 'time' | 'quota'>('all')
 // 卡密领取功能
 const cardClaimEnabled = ref(false)
 const cardClaimLoading = ref(false)
+
+// 卡密消费流水
+interface CardLog {
+  action: 'register' | 'renew' | 'claim'
+  username: string | null
+  cardCode: string
+  cardType: string
+  days: number
+  at: number
+}
+
+const cardLogs = ref<CardLog[]>([])
+const cardLogsTotal = ref(0)
+const cardLogsLoading = ref(false)
+const cardLogFilter = ref<'all' | 'register' | 'renew' | 'claim'>('all')
+
+const cardLogLabels: Record<string, string> = {
+  register: '注册激活',
+  renew: '续费使用',
+  claim: '卡密领取',
+}
+
+const cardLogColors: Record<string, string> = {
+  register: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  renew: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  claim: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+}
+
+async function fetchCardLogs() {
+  cardLogsLoading.value = true
+  try {
+    const { data } = await api.get('/api/admin/card-logs', {
+      params: { limit: 200, action: cardLogFilter.value === 'all' ? undefined : cardLogFilter.value },
+    })
+    if (data?.ok && data.data) {
+      cardLogs.value = Array.isArray(data.data.logs) ? data.data.logs : []
+      cardLogsTotal.value = data.data.total || 0
+    }
+  }
+  catch (error: any) {
+    toast.error(error?.response?.data?.error || '无法读取卡密流水')
+  }
+  finally {
+    cardLogsLoading.value = false
+  }
+}
+
+async function clearCardLogs() {
+  if (!window.confirm('确定清空全部卡密消费流水吗？该操作不可恢复。'))
+    return
+  try {
+    await api.delete('/api/admin/card-logs')
+    toast.success('卡密流水已清空')
+    cardLogs.value = []
+    cardLogsTotal.value = 0
+  }
+  catch (error: any) {
+    toast.error(error?.response?.data?.error || '清空失败')
+  }
+}
 
 const unusedTimeCardsCount = computed(() => {
   return cards.value.filter(c => c.type === 'time' && !c.usedBy && c.enabled).length
@@ -970,11 +1031,17 @@ function severityLabel(sev: string) {
 }
 
 watch(activeTab, (tab) => {
+  if (tab === 'card' && !cardLogs.value.length) {
+    fetchCardLogs()
+  }
   if (tab === 'audit' && !auditEntries.value.length) {
     fetchAuditLogs()
   }
   if (tab === 'alert' && !alertRules.value.length) {
     fetchAlertRules()
+  }
+  if (tab === 'announcement') {
+    fetchAnnouncement()
   }
 })
 
@@ -1012,6 +1079,7 @@ const newAlertRule = ref({
   threshold: 3,
   channel: 'log',
   endpoint: '',
+  token: '',
 })
 
 const conditionLabels: Record<string, string> = {
@@ -1023,6 +1091,81 @@ const conditionLabels: Record<string, string> = {
 const channelLabels: Record<string, string> = {
   webhook: 'Webhook',
   log: '系统日志',
+  qmsg: 'Qmsg',
+  serverchan: 'Server酱',
+  pushplus: 'PushPlus',
+  pushplushxtrip: 'PushPlus(葫芦侠)',
+  dingtalk: '钉钉',
+  wecom: '企业微信',
+  bark: 'Bark',
+  gocqhttp: 'GoCQHTTP',
+  onebot: 'OneBot',
+  atri: 'Atri',
+  pushdeer: 'PushDeer',
+  igot: 'iGot',
+  telegram: 'Telegram',
+  feishu: '飞书',
+  ifttt: 'IFTTT',
+  wecombot: '企业微信机器人',
+  discord: 'Discord',
+  wxpusher: 'WxPusher',
+}
+
+// 需要 Token 的渠道（webhook 用 endpoint，log 不需要）
+const CHANNELS_NEEDING_TOKEN = new Set([
+  'qmsg',
+  'serverchan',
+  'pushplus',
+  'pushplushxtrip',
+  'dingtalk',
+  'wecom',
+  'bark',
+  'gocqhttp',
+  'onebot',
+  'atri',
+  'pushdeer',
+  'igot',
+  'telegram',
+  'feishu',
+  'ifttt',
+  'wecombot',
+  'discord',
+  'wxpusher',
+])
+
+const alertTest = ref({
+  channel: 'log',
+  endpoint: '',
+  token: '',
+})
+const alertTestLoading = ref(false)
+const alertTestResult = ref('')
+
+async function sendAlertTest() {
+  if (alertTest.value.channel === 'log') {
+    alertTestResult.value = '系统日志渠道无需推送测试'
+    return
+  }
+  alertTestLoading.value = true
+  alertTestResult.value = ''
+  try {
+    const { data } = await api.post('/api/admin/alert-rules/test', alertTest.value)
+    if (data?.ok) {
+      alertTestResult.value = `测试推送成功：${data.data?.msg || '已发送'}`
+      toast.success('测试告警已发送')
+    }
+    else {
+      alertTestResult.value = `测试推送失败：${data?.error || '未知错误'}`
+      toast.error(alertTestResult.value)
+    }
+  }
+  catch (error: any) {
+    alertTestResult.value = `测试推送失败：${error?.response?.data?.error || error?.message || '未知错误'}`
+    toast.error(alertTestResult.value)
+  }
+  finally {
+    alertTestLoading.value = false
+  }
 }
 
 async function fetchAlertRules() {
@@ -1062,6 +1205,7 @@ async function createAlertRule() {
       threshold: 3,
       channel: 'log',
       endpoint: '',
+      token: '',
     }
     await fetchAlertRules()
   }
@@ -1095,6 +1239,73 @@ function formatAlertTime(ts: number) {
   if (!ts)
     return '-'
   return new Date(ts).toLocaleString('zh-CN', { hour12: false })
+}
+
+// ========== 公告管理 ==========
+const announcementContent = ref('')
+const announcementShowOnce = ref(false)
+const announcementLoading = ref(false)
+const announcementSaving = ref(false)
+const announcementError = ref('')
+const announcementSavedAt = ref(0)
+
+async function fetchAnnouncement() {
+  announcementLoading.value = true
+  announcementError.value = ''
+  try {
+    const { data } = await api.get('/api/announcement')
+    if (data?.ok && data.data) {
+      announcementContent.value = data.data.content || ''
+      announcementShowOnce.value = !!data.data.showOnce
+      announcementSavedAt.value = data.data.updatedAt || 0
+    }
+    else {
+      announcementError.value = String(data?.error || '无法读取公告')
+    }
+  }
+  catch (error: any) {
+    announcementError.value = String(error?.response?.data?.error || '无法读取公告')
+  }
+  finally {
+    announcementLoading.value = false
+  }
+}
+
+async function saveAnnouncement() {
+  if (!announcementContent.value.trim()) {
+    toast.error('公告内容不能为空')
+    return
+  }
+  announcementSaving.value = true
+  announcementError.value = ''
+  try {
+    const { data } = await api.post('/api/admin/announcement', {
+      content: announcementContent.value,
+      showOnce: announcementShowOnce.value,
+    })
+    if (data?.ok) {
+      announcementSavedAt.value = data.data?.updatedAt || Date.now()
+      toast.success('公告已保存')
+    }
+    else {
+      announcementError.value = String(data?.error || '保存失败')
+      toast.error(announcementError.value)
+    }
+  }
+  catch (error: any) {
+    announcementError.value = String(error?.response?.data?.error || '保存失败')
+    toast.error(announcementError.value)
+  }
+  finally {
+    announcementSaving.value = false
+  }
+}
+
+function clearAnnouncement() {
+  announcementContent.value = ''
+  announcementShowOnce.value = false
+  announcementSavedAt.value = 0
+  toast.success('已清空输入，保存后公告将停用')
 }
 </script>
 
@@ -1435,6 +1646,106 @@ function formatAlertTime(ts: number) {
                 <BaseButton variant="primary" size="sm" @click="createCard">
                   创建
                 </BaseButton>
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡密消费流水 -->
+          <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 class="flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
+                  <div class="i-carbon-data-view-alt" />
+                  卡密消费流水
+                </h4>
+                <p class="mt-1 text-xs text-[var(--color-text-secondary)]">
+                  记录卡密的注册激活、续费使用与领取记录，共 {{ cardLogsTotal }} 条
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="flex overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600">
+                  <button
+                    v-for="option in (['all', 'register', 'renew', 'claim'] as const)"
+                    :key="option"
+                    class="px-3 py-1.5 text-xs font-medium transition-colors"
+                    :class="cardLogFilter === option
+                      ? 'text-white'
+                      : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'"
+                    :style="cardLogFilter === option ? { backgroundColor: 'var(--theme-primary)' } : {}"
+                    @click="cardLogFilter = option; fetchCardLogs()"
+                  >
+                    {{ option === 'all' ? '全部' : cardLogLabels[option] }}
+                  </button>
+                </div>
+                <BaseButton variant="secondary" size="sm" :loading="cardLogsLoading" @click="fetchCardLogs">
+                  刷新
+                </BaseButton>
+                <BaseButton variant="danger" size="sm" @click="clearCardLogs">
+                  清空
+                </BaseButton>
+              </div>
+            </div>
+
+            <div class="mt-3 overflow-hidden border border-gray-200 rounded-lg dark:border-gray-700">
+              <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs text-gray-500 font-medium dark:text-gray-300">
+                        类型
+                      </th>
+                      <th class="px-4 py-2 text-left text-xs text-gray-500 font-medium dark:text-gray-300">
+                        卡密
+                      </th>
+                      <th class="px-4 py-2 text-left text-xs text-gray-500 font-medium dark:text-gray-300">
+                        用户
+                      </th>
+                      <th class="px-4 py-2 text-left text-xs text-gray-500 font-medium dark:text-gray-300">
+                        卡类型
+                      </th>
+                      <th class="px-4 py-2 text-left text-xs text-gray-500 font-medium dark:text-gray-300">
+                        数值
+                      </th>
+                      <th class="px-4 py-2 text-left text-xs text-gray-500 font-medium dark:text-gray-300">
+                        时间
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tr v-for="log in cardLogs" :key="`${log.at}-${log.cardCode}-${log.action}`" class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td class="whitespace-nowrap px-4 py-2">
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs" :class="cardLogColors[log.action]">
+                          {{ cardLogLabels[log.action] || log.action }}
+                        </span>
+                      </td>
+                      <td class="whitespace-nowrap px-4 py-2">
+                        <code class="rounded bg-gray-100 px-2 py-0.5 text-xs dark:bg-gray-700">{{ log.cardCode }}</code>
+                      </td>
+                      <td class="whitespace-nowrap px-4 py-2 text-sm text-gray-900 dark:text-white">
+                        {{ log.username || '（未登录领取）' }}
+                      </td>
+                      <td class="whitespace-nowrap px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                        {{ log.cardType === 'quota' ? '额度卡' : '时间卡' }}
+                      </td>
+                      <td class="whitespace-nowrap px-4 py-2 text-sm text-gray-900 dark:text-white">
+                        {{ log.days === -1 ? '永久' : `${log.days} ${log.cardType === 'quota' ? '额度' : '天'}` }}
+                      </td>
+                      <td class="whitespace-nowrap px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                        {{ log.at ? new Date(log.at).toLocaleString('zh-CN', { hour12: false }) : '-' }}
+                      </td>
+                    </tr>
+                    <tr v-if="cardLogsLoading">
+                      <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                        加载中...
+                      </td>
+                    </tr>
+                    <tr v-else-if="cardLogs.length === 0">
+                      <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                        暂无卡密消费流水
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -1958,6 +2269,137 @@ function formatAlertTime(ts: number) {
               </div>
             </div>
           </div>
+
+          <!-- 测试推送 -->
+          <div class="ds-surface p-4">
+            <h4 class="mb-3 text-sm font-medium">
+              测试推送
+            </h4>
+            <div class="grid gap-3 sm:grid-cols-3">
+              <BaseSelect v-model="alertTest.channel" label="渠道">
+                <option value="log">
+                  系统日志
+                </option>
+                <option v-for="(label, key) in channelLabels" :key="key" :value="key">
+                  {{ label }}
+                </option>
+              </BaseSelect>
+              <BaseInput
+                v-if="alertTest.channel === 'webhook'"
+                v-model="alertTest.endpoint"
+                label="Webhook URL"
+                placeholder="https://example.com/hook"
+                class="sm:col-span-2"
+              />
+              <BaseInput
+                v-else-if="CHANNELS_NEEDING_TOKEN.has(alertTest.channel)"
+                v-model="alertTest.token"
+                label="推送 Token"
+                placeholder="该渠道的推送 Token"
+                class="sm:col-span-2"
+              />
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-3">
+              <BaseButton size="sm" :loading="alertTestLoading" :disabled="alertTest.channel === 'log'" @click="sendAlertTest">
+                发送测试消息
+              </BaseButton>
+              <span v-if="alertTestResult" class="text-sm text-gray-600 dark:text-gray-400">
+                {{ alertTestResult }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 公告管理 -->
+        <div v-else-if="activeTab === 'announcement'" class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg text-gray-800 font-semibold dark:text-gray-200">
+              公告管理
+            </h3>
+            <BaseButton variant="secondary" size="sm" :loading="announcementLoading" @click="fetchAnnouncement">
+              刷新
+            </BaseButton>
+          </div>
+
+          <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h4 class="flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
+                  <div class="i-carbon-megaphone" />
+                  登录公告
+                </h4>
+                <p class="mt-1 text-xs text-[var(--color-text-secondary)]">
+                  编辑后保存，用户在登录后查看首页弹窗公告。留空并保存即停用公告。
+                </p>
+              </div>
+              <span
+                v-if="announcementSavedAt"
+                class="shrink-0 text-xs text-gray-400 dark:text-gray-500"
+              >
+                上次保存：{{ new Date(announcementSavedAt).toLocaleString('zh-CN', { hour12: false }) }}
+              </span>
+            </div>
+
+            <div class="mt-4">
+              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                公告内容
+              </label>
+              <textarea
+                v-model="announcementContent"
+                rows="6"
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-primary)]/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                placeholder="例如：欢迎使用 QQ 农场自动化助手，最新版本 v2.5.0 已发布，新增公告管理、告警推送等功能…"
+              />
+            </div>
+
+            <div class="mt-3 flex flex-wrap items-center gap-4">
+              <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  v-model="announcementShowOnce"
+                  type="checkbox"
+                  class="h-4 w-4 rounded border-gray-300 text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
+                >
+                仅展示一次（用户标记已读后不再弹出）
+              </label>
+              <span class="text-xs text-gray-400 dark:text-gray-500">
+                当前状态：{{ announcementShowOnce ? '单次展示' : '每次登录展示' }}
+              </span>
+            </div>
+
+            <p v-if="announcementError" class="mt-3 text-sm text-rose-600 dark:text-rose-400">
+              {{ announcementError }}
+            </p>
+
+            <div class="mt-4 flex flex-wrap gap-3">
+              <BaseButton variant="primary" :loading="announcementSaving" :disabled="!announcementContent.trim()" @click="saveAnnouncement">
+                保存公告
+              </BaseButton>
+              <BaseButton variant="secondary" @click="clearAnnouncement">
+                清空内容
+              </BaseButton>
+            </div>
+          </div>
+
+          <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+            <h4 class="flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
+              <div class="i-carbon-view" />
+              预览效果
+            </h4>
+            <p class="mt-1 mb-3 text-xs text-[var(--color-text-secondary)]">
+              以下为登录后公告弹窗的展示样式。
+            </p>
+            <div v-if="announcementContent.trim()" class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
+              <p class="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
+                {{ announcementContent }}
+              </p>
+              <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                —— {{ announcementShowOnce ? '仅展示一次，阅读后自动隐藏' : '每次登录展示' }}
+              </p>
+            </div>
+            <p v-else class="text-sm text-gray-400 dark:text-gray-500">
+              公告内容为空，登录后不会弹出公告。
+            </p>
+          </div>
         </div>
 
         <!-- 系统配置 -->
@@ -2239,8 +2681,8 @@ function formatAlertTime(ts: number) {
             <option value="log">
               系统日志
             </option>
-            <option value="webhook">
-              Webhook
+            <option v-for="(label, key) in channelLabels" :key="key" :value="key">
+              {{ label }}
             </option>
           </BaseSelect>
           <BaseInput
@@ -2248,6 +2690,12 @@ function formatAlertTime(ts: number) {
             v-model="newAlertRule.endpoint"
             label="Webhook URL"
             placeholder="https://example.com/hook"
+          />
+          <BaseInput
+            v-if="CHANNELS_NEEDING_TOKEN.has(newAlertRule.channel)"
+            v-model="newAlertRule.token"
+            label="推送 Token"
+            placeholder="该渠道的推送 Token"
           />
         </div>
         <div class="mt-4 flex justify-end gap-2">

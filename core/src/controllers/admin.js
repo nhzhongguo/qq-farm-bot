@@ -2181,6 +2181,98 @@ function startAdminServer(dataProvider) {
         }
     });
 
+    // 将触发的告警投递到外部渠道（webhook / pushoo 全渠道）
+    async function deliverAlertTrigger(trigger, rule) {
+        const { sendPushooMessage } = require('../services/push');
+        const ts = new Date(trigger.triggeredAt || Date.now()).toISOString().replace('T', ' ').slice(0, 19);
+        const conditionLabel = alertRuleEngine.CONDITION_TYPES[rule.condition] || rule.condition;
+        const title = `【农场告警】${rule.name}`;
+        const content = [
+            `规则: ${rule.name}`,
+            `条件: ${conditionLabel}（阈值 ${rule.threshold}，当前 ${trigger.actualValue}）`,
+            rule.username ? `账号: ${rule.username}` : '',
+            `时间: ${ts}`,
+        ].filter(Boolean).join('\n');
+        const result = await sendPushooMessage({
+            channel: rule.channel,
+            endpoint: rule.endpoint,
+            token: rule.token,
+            title,
+            content,
+        });
+        return result;
+    }
+
+    // 手动评估告警规则（运营排查用），触发时按规则渠道投递
+    app.post('/api/admin/alert-rules/evaluate', authRequired, adminRequired, async (req, res) => {
+        try {
+            const { consecutiveFailures, offlineDurationSec, taskErrorCount, username } = req.body || {};
+            const context = {
+                username: String(username || '').trim() || req.currentUser.username,
+                consecutiveFailures: Number(consecutiveFailures) || 0,
+                offlineDurationSec: Number(offlineDurationSec) || 0,
+                taskErrorCount: Number(taskErrorCount) || 0,
+            };
+            const triggered = alertRuleEngine.evaluate(context, deliverAlertTrigger);
+            auditLog.record({
+                actor: req.currentUser.username, action: 'alert-rule.evaluate', target: `count:${triggered.length}`,
+                details: { triggered: triggered.map(t => t.ruleName) }, ip: getClientIp(req),
+            });
+            res.json({ ok: true, data: { triggered, count: triggered.length } });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    // 发送测试告警消息到指定渠道（不创建规则）
+    app.post('/api/admin/alert-rules/test', authRequired, adminRequired, async (req, res) => {
+        try {
+            const { channel, endpoint, token } = req.body || {};
+            const chan = String(channel || '').trim();
+            if (!chan || !alertRuleEngine.CHANNEL_TYPES[chan]) {
+                return res.status(400).json({ ok: false, error: '不支持的告警通道' });
+            }
+            if (chan === 'webhook' && !String(endpoint || '').trim()) {
+                return res.status(400).json({ ok: false, error: 'Webhook 渠道需要填写接口地址' });
+            }
+            if (chan !== 'log' && chan !== 'webhook' && !String(token || '').trim()) {
+                return res.status(400).json({ ok: false, error: '该推送渠道需要填写 Token' });
+            }
+            const rule = {
+                name: '告警测试',
+                condition: 'consecutive_failures',
+                threshold: 1,
+                channel: chan,
+                endpoint,
+                token,
+            };
+            const trigger = {
+                id: 'test',
+                ruleId: 'test',
+                ruleName: rule.name,
+                condition: rule.condition,
+                threshold: 1,
+                actualValue: 1,
+                username: req.currentUser.username,
+                triggeredAt: Date.now(),
+                channel: chan,
+                endpoint: String(endpoint || '').trim(),
+            };
+            const result = await deliverAlertTrigger(trigger, rule);
+            const ok = !!(result && (result.ok || result.code === 'ok' || result.code === '0'));
+            if (!ok) {
+                return res.status(400).json({ ok: false, error: result?.msg || '推送失败', data: result });
+            }
+            auditLog.record({
+                actor: req.currentUser.username, action: 'alert-rule.test', target: `channel:${chan}`,
+                ip: getClientIp(req),
+            });
+            res.json({ ok: true, data: result });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
     // 保存系统配置
     app.post('/api/admin/system-config', authRequired, adminRequired, (req, res) => {
         try {
@@ -2335,6 +2427,33 @@ function startAdminServer(dataProvider) {
                 ip: getClientIp(req), severity: 'warning',
             });
             res.json({ ok: true });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // 获取卡密消费流水（注册激活/续费使用/领取）
+    app.get('/api/admin/card-logs', authRequired, adminRequired, (req, res) => {
+        try {
+            const limit = Math.min(parseInt(req.query.limit, 10) || 200, 1000);
+            const offset = parseInt(req.query.offset, 10) || 0;
+            const action = typeof req.query.action === 'string' ? req.query.action : null;
+            const result = userStore.getCardLogs(limit, offset, action);
+            res.json({ ok: true, data: result });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // 清空卡密消费流水
+    app.delete('/api/admin/card-logs', authRequired, adminRequired, (req, res) => {
+        try {
+            const result = userStore.clearCardLogs();
+            auditLog.record({
+                actor: req.currentUser.username, action: 'card.logs.clear',
+                details: { cleared: result.cleared }, ip: getClientIp(req), severity: 'warning',
+            });
+            res.json({ ok: true, data: result });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }

@@ -24,6 +24,9 @@
     "package:mac": "pnpm build:web && pnpm -C core build:mac",
     "package:release": "pnpm build:web && pnpm -C core build:release",
     "install:all": "pnpm install -r",
+    "release:check": "node scripts/release.js",
+    "release:tag": "node scripts/release.js --tag",
+    "release:bump": "node scripts/release.js --bump",
     "test:e2e": "pnpm -C web test:e2e",
     "test:e2e:smoke": "pnpm -C web test:e2e e2e/auth-smoke.spec.ts"
   }

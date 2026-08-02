@@ -53,6 +53,52 @@ test('rejects invalid channel type', () => {
     }), /告警通道/);
 });
 
+test('supports pushoo channels and stores token', () => {
+    const rule = engine.createRule({
+        name: '钉钉告警', condition: 'task_error_count', threshold: 5, channel: 'dingtalk', token: 'secret-token',
+    });
+    assert.equal(rule.channel, 'dingtalk');
+    assert.equal(rule.token, 'secret-token');
+    assert.equal(rule.endpoint, '');
+});
+
+test('webhook channel keeps endpoint and clears token', () => {
+    const rule = engine.createRule({
+        name: 'Webhook告警', condition: 'offline_duration', threshold: 60, channel: 'webhook', endpoint: 'http://example.com/hook', token: 'should-clear',
+    });
+    assert.equal(rule.channel, 'webhook');
+    assert.equal(rule.endpoint, 'http://example.com/hook');
+    assert.equal(rule.token, '');
+});
+
+test('evaluate delivers triggers via callback for non-log channels', async () => {
+    const rule = engine.createRule({
+        name: '投递测试', condition: 'consecutive_failures', threshold: 2, channel: 'telegram', token: 'tg-token',
+    });
+    const delivered = [];
+    const triggered = await engine.evaluate({ consecutiveFailures: 3, username: 'deliver_user' }, async (trigger, r) => {
+        delivered.push({ trigger, rule: r });
+    });
+    // 给异步投递一点时间
+    await new Promise(resolve => setTimeout(resolve, 20));
+    const found = triggered.find(t => t.ruleId === rule.id);
+    assert.ok(found);
+    assert.equal(delivered.length, 1);
+    assert.equal(delivered[0].rule.channel, 'telegram');
+    assert.equal(delivered[0].rule.token, 'tg-token');
+});
+
+test('evaluate does not deliver for log channel', async () => {
+    const isolated = createAlertRuleEngine({ filePath: path.join(dataDir, 'alert_log_only.json'), now: () => 2000000 });
+    const rule = isolated.createRule({
+        name: '日志不投递', condition: 'consecutive_failures', threshold: 1, channel: 'log',
+    });
+    let delivered = 0;
+    await isolated.evaluate({ consecutiveFailures: 3, username: 'log_user' }, async () => { delivered++; });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.equal(delivered, 0);
+});
+
 test('rejects non-positive threshold', () => {
     assert.throws(() => engine.createRule({
         name: 'test', condition: 'consecutive_failures', threshold: 0, channel: 'log',
