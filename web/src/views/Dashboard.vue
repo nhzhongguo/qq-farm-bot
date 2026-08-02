@@ -12,11 +12,13 @@ import { useAccountStore } from '@/stores/account'
 import { useBagStore } from '@/stores/bag'
 import { useStatusStore } from '@/stores/status'
 import { useToastStore } from '@/stores/toast'
+import { useUserStore } from '@/stores/user'
 
 const statusStore = useStatusStore()
 const accountStore = useAccountStore()
 const bagStore = useBagStore()
 const toastStore = useToastStore()
+const userStore = useUserStore()
 const {
   status,
   logs: statusLogs,
@@ -25,9 +27,44 @@ const {
 } = storeToRefs(statusStore)
 const { currentAccountId, currentAccount } = storeToRefs(accountStore)
 const { dashboardItems } = storeToRefs(bagStore)
+const { isAdmin } = storeToRefs(userStore)
 const logContainer = ref<HTMLElement | null>(null)
 const autoScroll = ref(true)
 const lastBagFetchAt = ref(0)
+const diagLoading = ref(false)
+
+async function generateDiagnostic() {
+  if (!currentAccountId.value)
+    return
+  diagLoading.value = true
+  try {
+    const { data } = await api.post('/api/admin/diagnostic-bundles', {
+      accountId: currentAccountId.value,
+      accountName: currentAccount.value?.name || '',
+      trigger: 'manual',
+    })
+    if (data?.ok) {
+      toastStore.success('诊断包已生成')
+      // 下载 JSON
+      const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `diagnostic-${currentAccountId.value}-${Date.now()}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+    else {
+      toastStore.error(data?.error || '生成失败')
+    }
+  }
+  catch (error: any) {
+    toastStore.error(error?.response?.data?.error || '生成失败')
+  }
+  finally {
+    diagLoading.value = false
+  }
+}
 const clearingLogs = ref(false)
 
 const allLogs = computed(() => {
@@ -466,6 +503,15 @@ useIntervalFn(updateCountdowns, 1000)
         </span>
       </template>
       <template #actions>
+        <BaseButton
+          v-if="isAdmin && currentAccountId"
+          variant="secondary"
+          :loading="diagLoading"
+          @click="generateDiagnostic"
+        >
+          <div class="i-carbon-task-approved" />
+          诊断
+        </BaseButton>
         <BaseButton variant="secondary" @click="refresh(true)">
           <div class="i-carbon-renew" />
           刷新

@@ -459,6 +459,38 @@ function validateUser(username, password, ip = 'unknown') {
     };
 }
 
+
+// 测试阶段：仅按用户名签发会话，跳过密码但保留强制改密标记。
+function validateUserWithoutPassword(username, ip = 'unknown') {
+    loadUsers();
+    loadLoginAttempts();
+
+    const rateLimitResult = checkRateLimit(ip);
+    if (!rateLimitResult.allowed) {
+        return {
+            error: 'rate_limit',
+            message: rateLimitResult.message,
+            remainingMs: rateLimitResult.remainingMs,
+        };
+    }
+
+    const user = users.find(u => u.username === username);
+    if (!user) {
+        return { error: 'invalid_credentials', message: '用户不存在' };
+    }
+
+    clearFailedAttempts(username);
+
+    return {
+        username: user.username,
+        role: user.role,
+        cardCode: user.cardCode || null,
+        card: user.card || null,
+        accountLimit: user.accountLimit || DEFAULT_ACCOUNT_LIMIT,
+        mustChangePassword: user.mustChangePassword === true,
+    };
+}
+
 function registerUser(username, password, cardCode) {
     loadUsers();
     loadCards();
@@ -997,6 +1029,7 @@ function clearExpiredClaimRecords() {
 
 module.exports = {
     validateUser,
+    validateUserWithoutPassword,
     registerUser,
     renewUser,
     getAllUsers,

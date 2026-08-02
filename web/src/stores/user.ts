@@ -76,7 +76,7 @@ export const useUserStore = defineStore('user', () => {
     return date.toLocaleString('zh-CN')
   })
 
-  async function login(username: string, password: string): Promise<LoginResult> {
+  async function login(username: string, password = ''): Promise<LoginResult> {
     try {
       const res = await api.post('/api/login', { username, password })
       if (res.data.ok) {

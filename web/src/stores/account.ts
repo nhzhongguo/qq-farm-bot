@@ -101,6 +101,33 @@ export const useAccountStore = defineStore('account', () => {
     await fetchAccounts()
   }
 
+  // 批量启动/停止/重启账号。返回每个账号的执行结果。
+  type BatchOp = 'start' | 'stop' | 'restart'
+  interface BatchResultItem { id: string | number, ok: boolean, error?: string }
+  interface BatchResponse { ok: boolean, data?: { results: BatchResultItem[] }, error?: string }
+
+  async function batchAccounts(operation: BatchOp, ids: Array<string | number>): Promise<BatchResultItem[]> {
+    if (!Array.isArray(ids) || ids.length === 0)
+      return []
+    const res = await api.post<BatchResponse>(`/api/accounts/batch/${operation}`, { accountIds: ids })
+    if (!res.data?.ok)
+      throw new Error(res.data?.error || `批量${operation} 失败`)
+    await fetchAccounts()
+    return res.data.data?.results || []
+  }
+
+  async function batchStart(ids: Array<string | number>) {
+    return batchAccounts('start', ids)
+  }
+
+  async function batchStop(ids: Array<string | number>) {
+    return batchAccounts('stop', ids)
+  }
+
+  async function batchRestart(ids: Array<string | number>) {
+    return batchAccounts('restart', ids)
+  }
+
   async function deleteAccount(id: string) {
     await api.delete(`/api/accounts/${id}`)
     if (currentAccountId.value === id) {
@@ -154,6 +181,9 @@ export const useAccountStore = defineStore('account', () => {
     selectAccount,
     startAccount,
     stopAccount,
+    batchStart,
+    batchStop,
+    batchRestart,
     deleteAccount,
     fetchLogs,
     addAccount,

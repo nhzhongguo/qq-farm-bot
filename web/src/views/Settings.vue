@@ -15,9 +15,11 @@ import PageHeader from '@/components/ui/PageHeader.vue'
 import { getPlatformClass, getPlatformLabel, useAccountStore } from '@/stores/account'
 import { useFarmStore } from '@/stores/farm'
 import { useSettingStore } from '@/stores/setting'
+import { useToastStore } from '@/stores/toast'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const toastStore = useToastStore()
 const accountStore = useAccountStore()
 const userStore = useUserStore()
 const settingStore = useSettingStore()
@@ -171,6 +173,82 @@ function openClearStoppedConfirm() {
     return
   }
   showClearStoppedConfirm.value = true
+}
+
+// ==================== 批量运维 ====================
+const selectedAccountIds = ref<Set<string>>(new Set())
+const batchSelectAll = ref(false)
+const batchOperating = ref(false)
+
+interface BatchResultItem { id: string | number, ok: boolean, error?: string }
+
+function toggleAccountSelection(id: string) {
+  const idStr = String(id)
+  if (selectedAccountIds.value.has(idStr)) {
+    selectedAccountIds.value.delete(idStr)
+    batchSelectAll.value = false
+  }
+  else {
+    selectedAccountIds.value.add(idStr)
+    if (accounts.value.length > 0 && accounts.value.every((acc: any) => selectedAccountIds.value.has(String(acc.id)))) {
+      batchSelectAll.value = true
+    }
+  }
+}
+
+function toggleBatchSelectAll() {
+  if (batchSelectAll.value) {
+    accounts.value.forEach((acc: any) => selectedAccountIds.value.add(String(acc.id)))
+  }
+  else {
+    selectedAccountIds.value.clear()
+  }
+}
+
+function clearSelection() {
+  selectedAccountIds.value.clear()
+  batchSelectAll.value = false
+}
+
+const selectedCount = computed(() => selectedAccountIds.value.size)
+
+async function runBatchOperation(operation: 'start' | 'stop' | 'restart') {
+  const ids = Array.from(selectedAccountIds.value)
+  if (ids.length === 0) {
+    toastStore.warning('请先选择要操作的账号')
+    return
+  }
+  const opLabel = operation === 'start' ? '启动' : operation === 'stop' ? '停止' : '重启'
+  if (!confirm(`确定要批量${opLabel}选中的 ${ids.length} 个账号吗？`))
+    return
+
+  batchOperating.value = true
+  try {
+    const results: BatchResultItem[] = operation === 'start'
+      ? await accountStore.batchStart(ids)
+      : operation === 'stop'
+        ? await accountStore.batchStop(ids)
+        : await accountStore.batchRestart(ids)
+
+    const successCount = results.filter(r => r.ok).length
+    const failCount = results.length - successCount
+    if (failCount === 0) {
+      toastStore.success(`批量${opLabel}完成：成功 ${successCount} 个`)
+    }
+    else if (successCount === 0) {
+      toastStore.error(`批量${opLabel}失败：全部 ${failCount} 个失败`)
+    }
+    else {
+      toastStore.warning(`批量${opLabel}部分成功：成功 ${successCount} 个，失败 ${failCount} 个`)
+    }
+    clearSelection()
+  }
+  catch (e: any) {
+    toastStore.error(e.message || `批量${opLabel}失败`)
+  }
+  finally {
+    batchOperating.value = false
+  }
 }
 
 async function confirmClearStopped() {
@@ -486,6 +564,161 @@ async function saveStrategySettings() {
     strategySaving.value = false
   }
 }
+
+// ==================== 配置导入/导出/模板 ====================
+const showTemplateModal = ref(false)
+const templates = ref<any[]>([])
+const templateLoading = ref(false)
+const newTemplateName = ref('')
+const newTemplateDesc = ref('')
+
+async function exportConfig() {
+  if (!currentAccountId.value)
+    return
+  try {
+    const fullSettings = {
+      ...settings.value,
+      ...localStrategySettings.value,
+    }
+    const blob = new Blob([JSON.stringify({
+      schemaVersion: 1,
+      exportedAt: Date.now(),
+      config: fullSettings,
+    }, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `farm-config-${currentAccountId.value}-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toastStore.success('配置已导出')
+  }
+  catch (error: any) {
+    toastStore.error(error?.message || '导出失败')
+  }
+}
+
+function importConfig() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = async (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file)
+      return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      const { data: result } = await api.post('/api/strategy-templates/validate', data)
+      if (!result?.valid) {
+        toastStore.error(`配置验证失败: ${result?.errors?.join('; ') || '未知错误'}`)
+        return
+      }
+      // 应用配置到本地
+      if (result.config.intervals)
+        localStrategySettings.value.intervals = result.config.intervals
+      if (result.config.strategy)
+        localStrategySettings.value.plantingStrategy = result.config.strategy
+      if (result.config.preferredSeed)
+        localStrategySettings.value.preferredSeedId = result.config.preferredSeed
+      if (result.config.stealDelaySeconds !== undefined)
+        localStrategySettings.value.stealDelaySeconds = result.config.stealDelaySeconds
+      if (result.config.plantOrderRandom !== undefined)
+        localStrategySettings.value.plantOrderRandom = result.config.plantOrderRandom
+      if (result.config.plantDelaySeconds !== undefined)
+        localStrategySettings.value.plantDelaySeconds = result.config.plantDelaySeconds
+      if (result.config.friendQuietHours)
+        localStrategySettings.value.friendQuietHours = result.config.friendQuietHours
+      toastStore.success('配置已导入，请点击保存以应用')
+    }
+    catch (error: any) {
+      toastStore.error(error?.message || '导入失败')
+    }
+  }
+  input.click()
+}
+
+async function fetchTemplates() {
+  templateLoading.value = true
+  try {
+    const { data } = await api.get('/api/strategy-templates')
+    if (data?.ok)
+      templates.value = data.data?.templates || []
+  }
+  catch { /* ignore */ }
+  finally { templateLoading.value = false }
+}
+
+async function saveCurrentAsTemplate() {
+  if (!newTemplateName.value.trim()) {
+    toastStore.error('请输入模板名称')
+    return
+  }
+  try {
+    const fullSettings = {
+      ...settings.value,
+      ...localStrategySettings.value,
+    }
+    await api.post('/api/strategy-templates', {
+      name: newTemplateName.value,
+      description: newTemplateDesc.value,
+      configData: fullSettings,
+    })
+    toastStore.success('模板已保存')
+    newTemplateName.value = ''
+    newTemplateDesc.value = ''
+    await fetchTemplates()
+  }
+  catch (error: any) {
+    toastStore.error(error?.response?.data?.error || '保存失败')
+  }
+}
+
+async function applyTemplate(id: string) {
+  try {
+    const { data } = await api.get(`/api/strategy-templates/${id}`)
+    if (!data?.ok)
+      return
+    const config = data.data?.config
+    if (!config)
+      return
+    if (config.intervals)
+      localStrategySettings.value.intervals = config.intervals
+    if (config.strategy)
+      localStrategySettings.value.plantingStrategy = config.strategy
+    if (config.preferredSeed)
+      localStrategySettings.value.preferredSeedId = config.preferredSeed
+    if (config.stealDelaySeconds !== undefined)
+      localStrategySettings.value.stealDelaySeconds = config.stealDelaySeconds
+    if (config.plantOrderRandom !== undefined)
+      localStrategySettings.value.plantOrderRandom = config.plantOrderRandom
+    if (config.plantDelaySeconds !== undefined)
+      localStrategySettings.value.plantDelaySeconds = config.plantDelaySeconds
+    if (config.friendQuietHours)
+      localStrategySettings.value.friendQuietHours = config.friendQuietHours
+    toastStore.success('模板已加载，请点击保存以应用')
+    showTemplateModal.value = false
+  }
+  catch (error: any) {
+    toastStore.error(error?.response?.data?.error || '加载失败')
+  }
+}
+
+async function deleteTemplate(id: string) {
+  try {
+    await api.delete(`/api/strategy-templates/${id}`)
+    toastStore.success('模板已删除')
+    await fetchTemplates()
+  }
+  catch (error: any) {
+    toastStore.error(error?.response?.data?.error || '删除失败')
+  }
+}
+
+watch(showTemplateModal, (visible) => {
+  if (visible)
+    fetchTemplates()
+})
 
 watch(currentAccountId, async () => {
   if (currentAccountId.value) {
@@ -932,94 +1165,165 @@ async function handleTestOffline() {
           </template>
         </EmptyState>
 
-        <div v-else class="grid grid-cols-1 gap-4 lg:grid-cols-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div
-            v-for="acc in accounts"
-            :key="acc.id"
-            class="ds-card cursor-pointer p-3 sm:p-4"
-            :class="String(currentAccountId) === String(acc.id) ? 'ring-2 ring-[var(--theme-primary)]' : ''"
-            :style="String(currentAccountId) === String(acc.id)
-              ? { borderColor: 'var(--theme-primary)', backgroundColor: 'rgba(var(--theme-primary-rgb), 0.08)' }
-              : {}"
-            @click="selectAccount(acc)"
-          >
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-              <div class="min-w-0 flex flex-1 items-center gap-3">
-                <div class="h-10 w-10 flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-bg-subtle)] sm:h-12 sm:w-12">
-                  <img v-if="acc.uin" :src="`https://q1.qlogo.cn/g?b=qq&nk=${acc.uin}&s=100`" class="h-full w-full object-cover">
-                  <div v-else class="i-carbon-user text-xl text-[var(--color-text-tertiary)] sm:text-2xl" />
-                </div>
-                <div class="min-w-0 flex-1">
-                  <h4 class="truncate text-base font-bold sm:text-lg">
-                    {{ acc.name || acc.nick || acc.id }}
-                  </h4>
-                  <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
-                    <span
-                      v-if="acc.platform"
-                      class="rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight"
-                      :class="getPlatformClass(acc.platform)"
-                    >
-                      {{ getPlatformLabel(acc.platform) }}
-                    </span>
-                    <span class="truncate text-xs text-[var(--color-text-secondary)] sm:text-sm">
-                      {{ acc.uin || '未绑定' }}
-                    </span>
+        <div v-else class="space-y-3">
+          <!-- 批量操作工具栏 -->
+          <div class="ds-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+            <div class="flex items-center gap-3">
+              <label class="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 cursor-pointer border-gray-300 rounded text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
+                  :checked="batchSelectAll"
+                  :disabled="batchOperating"
+                  @change="toggleBatchSelectAll"
+                >
+                <span class="text-[var(--color-text-primary)] font-medium">全选</span>
+              </label>
+              <span class="text-sm text-[var(--color-text-secondary)]">
+                已选 {{ selectedCount }} / {{ accounts.length }}
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                :disabled="selectedCount === 0 || batchOperating"
+                @click="runBatchOperation('start')"
+              >
+                <div class="i-carbon-play-filled mr-1" />
+                批量启动
+              </BaseButton>
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                :disabled="selectedCount === 0 || batchOperating"
+                @click="runBatchOperation('stop')"
+              >
+                <div class="i-carbon-stop-filled mr-1" />
+                批量停止
+              </BaseButton>
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                :disabled="selectedCount === 0 || batchOperating"
+                @click="runBatchOperation('restart')"
+              >
+                <div class="i-carbon-renew mr-1" />
+                批量重启
+              </BaseButton>
+              <BaseButton
+                v-if="selectedCount > 0"
+                variant="ghost"
+                size="sm"
+                :disabled="batchOperating"
+                @click="clearSelection"
+              >
+                清除选择
+              </BaseButton>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-4 lg:grid-cols-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div
+              v-for="acc in accounts"
+              :key="acc.id"
+              class="ds-card relative cursor-pointer p-3 sm:p-4"
+              :class="[
+                String(currentAccountId) === String(acc.id) ? 'ring-2 ring-[var(--theme-primary)]' : '',
+                selectedAccountIds.has(String(acc.id)) ? 'ring-2 ring-blue-400' : '',
+              ]"
+              :style="String(currentAccountId) === String(acc.id)
+                ? { borderColor: 'var(--theme-primary)', backgroundColor: 'rgba(var(--theme-primary-rgb), 0.08)' }
+                : {}"
+              @click="selectAccount(acc)"
+            >
+              <div class="absolute left-2 top-2 z-10">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 cursor-pointer border-gray-300 rounded text-blue-500 focus:ring-blue-500"
+                  :checked="selectedAccountIds.has(String(acc.id))"
+                  :disabled="batchOperating"
+                  @click.stop="toggleAccountSelection(String(acc.id))"
+                >
+              </div>
+              <div class="flex flex-col gap-3 pl-6 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:pl-6">
+                <div class="min-w-0 flex flex-1 items-center gap-3">
+                  <div class="h-10 w-10 flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--color-bg-subtle)] sm:h-12 sm:w-12">
+                    <img v-if="acc.uin" :src="`https://q1.qlogo.cn/g?b=qq&nk=${acc.uin}&s=100`" class="h-full w-full object-cover">
+                    <div v-else class="i-carbon-user text-xl text-[var(--color-text-tertiary)] sm:text-2xl" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <h4 class="truncate text-base font-bold sm:text-lg">
+                      {{ acc.name || acc.nick || acc.id }}
+                    </h4>
+                    <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span
+                        v-if="acc.platform"
+                        class="rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight"
+                        :class="getPlatformClass(acc.platform)"
+                      >
+                        {{ getPlatformLabel(acc.platform) }}
+                      </span>
+                      <span class="truncate text-xs text-[var(--color-text-secondary)] sm:text-sm">
+                        {{ acc.uin || '未绑定' }}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="flex items-center justify-end gap-2 sm:flex-col sm:items-end">
-                <span class="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] sm:hidden">
-                  <div class="h-2 w-2 rounded-full" :class="acc.running ? 'bg-green-500' : 'bg-gray-300'" />
-                  {{ acc.running ? '运行中' : '已停止' }}
-                </span>
-                <BaseButton
-                  variant="secondary"
-                  size="sm"
-                  class="border rounded-full shadow-sm transition-all duration-500 ease-in-out sm:w-20 active:scale-95"
-                  :class="acc.running ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100 focus:ring-red-500 active:border-red-300 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 dark:focus:ring-red-500 dark:active:border-red-700' : 'border-green-200 bg-green-50 text-green-600 hover:bg-green-100 focus:ring-green-500 active:border-green-300 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30 dark:focus:ring-green-500 dark:active:border-green-700'"
-                  :disabled="!acc.running && isAccountOpsDisabled"
-                  :title="!acc.running && isAccountOpsDisabled ? '账号已到期，无法启动账号' : ''"
-                  @click="toggleAccount(acc)"
-                >
-                  <div :class="acc.running ? 'i-carbon-stop-filled' : 'i-carbon-play-filled'" class="mr-1" />
-                  {{ acc.running ? '停止' : '启动' }}
-                </BaseButton>
-              </div>
-            </div>
-
-            <div class="mt-3 flex items-center justify-between border-t border-[var(--color-border-default)] pt-3 sm:mt-4 sm:pt-4">
-              <div class="hidden items-center gap-2 text-sm text-[var(--color-text-secondary)] sm:flex">
-                <span class="flex items-center gap-1">
-                  <div class="h-2 w-2 rounded-full" :class="acc.running ? 'bg-green-500' : 'bg-gray-300'" />
-                  {{ acc.running ? '运行中' : '已停止' }}
-                </span>
+                <div class="flex items-center justify-end gap-2 sm:flex-col sm:items-end">
+                  <span class="flex items-center gap-1 text-xs text-[var(--color-text-secondary)] sm:hidden">
+                    <div class="h-2 w-2 rounded-full" :class="acc.running ? 'bg-green-500' : 'bg-gray-300'" />
+                    {{ acc.running ? '运行中' : '已停止' }}
+                  </span>
+                  <BaseButton
+                    variant="secondary"
+                    size="sm"
+                    class="border rounded-full shadow-sm transition-all duration-500 ease-in-out sm:w-20 active:scale-95"
+                    :class="acc.running ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100 focus:ring-red-500 active:border-red-300 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 dark:focus:ring-red-500 dark:active:border-red-700' : 'border-green-200 bg-green-50 text-green-600 hover:bg-green-100 focus:ring-green-500 active:border-green-300 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30 dark:focus:ring-green-500 dark:active:border-green-700'"
+                    :disabled="(!acc.running && isAccountOpsDisabled) || batchOperating"
+                    :title="!acc.running && isAccountOpsDisabled ? '账号已到期，无法启动账号' : ''"
+                    @click="toggleAccount(acc)"
+                  >
+                    <div :class="acc.running ? 'i-carbon-stop-filled' : 'i-carbon-play-filled'" class="mr-1" />
+                    {{ acc.running ? '停止' : '启动' }}
+                  </BaseButton>
+                </div>
               </div>
 
-              <div class="flex flex-1 justify-end gap-1 sm:flex-initial sm:gap-2">
-                <BaseButton
-                  variant="ghost"
-                  class="min-h-[36px] min-w-[36px] !p-2"
-                  title="设置"
-                  @click="openSettings(acc)"
-                >
-                  <div i-carbon-settings />
-                </BaseButton>
-                <BaseButton
-                  variant="ghost"
-                  class="min-h-[36px] min-w-[36px] !p-2"
-                  title="编辑"
-                  @click="openEditModal(acc)"
-                >
-                  <div i-carbon-edit />
-                </BaseButton>
-                <BaseButton
-                  variant="ghost"
-                  class="min-h-[36px] min-w-[36px] text-red-500 !p-2 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
-                  title="删除"
-                  @click="handleDelete(acc)"
-                >
-                  <div i-carbon-trash-can />
-                </BaseButton>
+              <div class="mt-3 flex items-center justify-between border-t border-[var(--color-border-default)] pt-3 sm:mt-4 sm:pt-4">
+                <div class="hidden items-center gap-2 text-sm text-[var(--color-text-secondary)] sm:flex">
+                  <span class="flex items-center gap-1">
+                    <div class="h-2 w-2 rounded-full" :class="acc.running ? 'bg-green-500' : 'bg-gray-300'" />
+                    {{ acc.running ? '运行中' : '已停止' }}
+                  </span>
+                </div>
+
+                <div class="flex flex-1 justify-end gap-1 sm:flex-initial sm:gap-2">
+                  <BaseButton
+                    variant="ghost"
+                    class="min-h-[36px] min-w-[36px] !p-2"
+                    title="设置"
+                    @click="openSettings(acc)"
+                  >
+                    <div i-carbon-settings />
+                  </BaseButton>
+                  <BaseButton
+                    variant="ghost"
+                    class="min-h-[36px] min-w-[36px] !p-2"
+                    title="编辑"
+                    @click="openEditModal(acc)"
+                  >
+                    <div i-carbon-edit />
+                  </BaseButton>
+                  <BaseButton
+                    variant="ghost"
+                    class="min-h-[36px] min-w-[36px] text-red-500 !p-2 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300"
+                    title="删除"
+                    @click="handleDelete(acc)"
+                  >
+                    <div i-carbon-trash-can />
+                  </BaseButton>
+                </div>
               </div>
             </div>
           </div>
@@ -1276,7 +1580,16 @@ async function handleTestOffline() {
             </div>
           </div>
 
-          <div class="flex justify-end gap-2 border-t pt-3 dark:border-gray-700">
+          <div class="flex flex-wrap justify-end gap-2 border-t pt-3 dark:border-gray-700">
+            <BaseButton variant="secondary" size="sm" @click="exportConfig">
+              导出配置
+            </BaseButton>
+            <BaseButton variant="secondary" size="sm" @click="importConfig">
+              导入配置
+            </BaseButton>
+            <BaseButton variant="secondary" size="sm" @click="showTemplateModal = true">
+              模板管理
+            </BaseButton>
             <BaseButton
               variant="primary"
               size="sm"
@@ -1612,5 +1925,69 @@ async function handleTestOffline() {
       @confirm="modalVisible = false"
       @cancel="modalVisible = false"
     />
+
+    <!-- 模板管理弹窗 -->
+    <div v-if="showTemplateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showTemplateModal = false">
+      <div class="ds-surface max-h-[80vh] max-w-2xl w-full overflow-y-auto p-6">
+        <div class="mb-4 flex items-center justify-between">
+          <h3 class="text-lg font-bold">
+            策略模板管理
+          </h3>
+          <button class="text-gray-400 hover:text-gray-600" @click="showTemplateModal = false">
+            <div class="i-carbon-close text-xl" />
+          </button>
+        </div>
+
+        <!-- 保存当前配置为模板 -->
+        <div class="mb-4 border-b pb-4 dark:border-gray-700">
+          <h4 class="mb-2 text-sm font-medium">
+            保存当前配置为模板
+          </h4>
+          <div class="flex flex-wrap gap-2">
+            <BaseInput
+              v-model="newTemplateName"
+              placeholder="模板名称"
+              class="flex-1"
+            />
+            <BaseInput
+              v-model="newTemplateDesc"
+              placeholder="描述（可选）"
+              class="flex-1"
+            />
+            <BaseButton size="sm" @click="saveCurrentAsTemplate">
+              保存
+            </BaseButton>
+          </div>
+        </div>
+
+        <!-- 模板列表 -->
+        <div v-if="templateLoading" class="py-4 text-center text-gray-500">
+          加载中...
+        </div>
+        <div v-else-if="!templates.length" class="py-4 text-center text-gray-500">
+          暂无模板
+        </div>
+        <div v-else class="space-y-2">
+          <div v-for="t in templates" :key="t.id" class="flex items-center justify-between border-b pb-2 dark:border-gray-700">
+            <div class="min-w-0 flex-1">
+              <div class="font-medium">
+                {{ t.name }}
+              </div>
+              <div v-if="t.description" class="text-sm text-gray-500">
+                {{ t.description }}
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <BaseButton size="sm" variant="secondary" @click="applyTemplate(t.id)">
+                加载
+              </BaseButton>
+              <BaseButton size="sm" variant="danger" @click="deleteTemplate(t.id)">
+                删除
+              </BaseButton>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

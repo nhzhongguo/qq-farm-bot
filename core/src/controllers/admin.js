@@ -25,6 +25,10 @@ const { WxLoginSessionError, wxLoginSessionManager } = require('../services/wx-l
 const userStore = require('../models/user-store');
 const { rateLimitMiddleware, resetRateLimitStore } = require('../services/security');
 const { createRuntimeDoctor } = require('../services/runtime-doctor');
+const auditLog = require('../services/audit-log');
+const diagnosticBundle = require('../services/diagnostic-bundle');
+const strategyTemplate = require('../services/strategy-template');
+const alertRuleEngine = require('../services/alert-rule-engine');
 
 const adminLogger = createModuleLogger('admin');
 
@@ -321,14 +325,19 @@ function startAdminServer(dataProvider) {
         maxRequests: 10,
     });
 
+    // 测试阶段：关闭密码校验，仅按用户名登录。
+    const disablePasswordLogin = process.env.FARM_TEST === '1';
+
     // 登录与鉴权
     app.post('/api/login', loginRateLimit, (req, res) => {
         const { username, password } = req.body || {};
         const clientIp = getClientIp(req);
         const userAgent = req.headers['user-agent'] || 'unknown';
 
-        if (username && password) {
-            const user = userStore.validateUser(username, password, clientIp);
+        if (username && (disablePasswordLogin || password)) {
+            const user = disablePasswordLogin
+                ? userStore.validateUserWithoutPassword(username, clientIp)
+                : userStore.validateUser(username, password, clientIp);
             
             if (user && user.error) {
                 const statusCode = user.error === 'rate_limit' ? 429 : 
@@ -1554,6 +1563,100 @@ function startAdminServer(dataProvider) {
         }
     });
 
+    // API: 批量启动账号
+    app.post('/api/accounts/batch/start', authRequired, (req, res) => {
+        try {
+            const { accountIds } = req.body || {};
+            if (!Array.isArray(accountIds) || accountIds.length === 0) {
+                return res.status(400).json({ ok: false, error: '请提供账号 ID 列表' });
+            }
+            const results = [];
+            for (const rawId of accountIds) {
+                const accountId = resolveAccId(rawId);
+                if (!checkAccountAccess(req, accountId)) {
+                    results.push({ id: rawId, ok: false, error: '无权访问' });
+                    continue;
+                }
+                try {
+                    const ok = provider.startAccount(accountId);
+                    results.push({ id: rawId, ok });
+                } catch (e) {
+                    results.push({ id: rawId, ok: false, error: e.message });
+                }
+            }
+            auditLog.record({
+                actor: req.currentUser.username, action: 'account.batch.start', target: `count:${accountIds.length}`,
+                details: { accountIds }, ip: getClientIp(req),
+            });
+            res.json({ ok: true, data: { results } });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // API: 批量停止账号
+    app.post('/api/accounts/batch/stop', authRequired, (req, res) => {
+        try {
+            const { accountIds } = req.body || {};
+            if (!Array.isArray(accountIds) || accountIds.length === 0) {
+                return res.status(400).json({ ok: false, error: '请提供账号 ID 列表' });
+            }
+            const results = [];
+            for (const rawId of accountIds) {
+                const accountId = resolveAccId(rawId);
+                if (!checkAccountAccess(req, accountId)) {
+                    results.push({ id: rawId, ok: false, error: '无权访问' });
+                    continue;
+                }
+                try {
+                    const ok = provider.stopAccount(accountId);
+                    results.push({ id: rawId, ok });
+                } catch (e) {
+                    results.push({ id: rawId, ok: false, error: e.message });
+                }
+            }
+            auditLog.record({
+                actor: req.currentUser.username, action: 'account.batch.stop', target: `count:${accountIds.length}`,
+                details: { accountIds }, ip: getClientIp(req), severity: 'warning',
+            });
+            res.json({ ok: true, data: { results } });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // API: 批量重启账号
+    app.post('/api/accounts/batch/restart', authRequired, (req, res) => {
+        try {
+            const { accountIds } = req.body || {};
+            if (!Array.isArray(accountIds) || accountIds.length === 0) {
+                return res.status(400).json({ ok: false, error: '请提供账号 ID 列表' });
+            }
+            const results = [];
+            for (const rawId of accountIds) {
+                const accountId = resolveAccId(rawId);
+                if (!checkAccountAccess(req, accountId)) {
+                    results.push({ id: rawId, ok: false, error: '无权访问' });
+                    continue;
+                }
+                try {
+                    provider.stopAccount(accountId);
+                    const ok = provider.startAccount(accountId);
+                    results.push({ id: rawId, ok });
+                } catch (e) {
+                    results.push({ id: rawId, ok: false, error: e.message });
+                }
+            }
+            auditLog.record({
+                actor: req.currentUser.username, action: 'account.batch.restart', target: `count:${accountIds.length}`,
+                details: { accountIds }, ip: getClientIp(req), severity: 'warning',
+            });
+            res.json({ ok: true, data: { results } });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
     // API: 农场一键操作
     app.post('/api/farm/operate', async (req, res) => {
         const id = getAccId(req);
@@ -1833,6 +1936,7 @@ function startAdminServer(dataProvider) {
     });
 
     app.get('/api/admin/doctor', authRequired, adminRequired, (req, res) => {
+        const storeFilePath = path.join(getDataDir(), 'store.json');
         const doctor = createRuntimeDoctor({
             dataDir: getDataDir(),
             versionManifestPath: path.resolve(__dirname, '../../..', 'version.json'),
@@ -1841,8 +1945,240 @@ function startAdminServer(dataProvider) {
                 { id: 'item-config', label: '物品配置', path: getResourcePath('gameConfig', 'ItemInfo.json') },
                 { id: 'core-proto', label: '核心协议', path: getResourcePath('proto', 'corepb.proto') },
             ],
+            storeFilePath,
+            requiredStoreFields: ['accounts'],
+            schedulerSnapshotFn: () => {
+                try {
+                    return getSchedulerRegistrySnapshot();
+                } catch (e) {
+                    return { running: [], error: e.message };
+                }
+            },
         });
+        try {
+            auditLog.record({
+                actor: req.currentUser?.username || 'system',
+                action: 'admin.doctor.check',
+                target: 'runtime',
+                severity: 'info',
+                ip: getClientIp(req),
+            });
+        } catch {
+            // 审计日志失败不影响 doctor 检查结果
+        }
         res.json({ ok: true, data: doctor.check() });
+    });
+
+    // ============ 审计日志 API（仅管理员） ============
+
+    app.get('/api/admin/audit-log', authRequired, adminRequired, (req, res) => {
+        try {
+            const entries = auditLog.list({
+                actor: req.query.actor,
+                action: req.query.action,
+                severity: req.query.severity,
+                limit: req.query.limit,
+            });
+            res.json({ ok: true, data: { schemaVersion: auditLog.SCHEMA_VERSION, entries } });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    // ============ 诊断包 API（仅管理员） ============
+
+    app.get('/api/admin/diagnostic-bundles', authRequired, adminRequired, (req, res) => {
+        try {
+            const bundles = diagnosticBundle.list({
+                accountId: req.query.accountId,
+                limit: req.query.limit,
+            });
+            res.json({ ok: true, data: { schemaVersion: diagnosticBundle.SCHEMA_VERSION, bundles } });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    app.get('/api/admin/diagnostic-bundles/:id', authRequired, adminRequired, (req, res) => {
+        try {
+            const bundle = diagnosticBundle.get(req.params.id);
+            if (!bundle) {
+                return res.status(404).json({ ok: false, error: '诊断包不存在' });
+            }
+            res.json({ ok: true, data: bundle });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    app.post('/api/admin/diagnostic-bundles', authRequired, adminRequired, (req, res) => {
+        try {
+            const { accountId, accountName, trigger } = req.body || {};
+            if (!accountId) {
+                return res.status(400).json({ ok: false, error: '请提供账号 ID' });
+            }
+
+            // 从 provider 获取账号状态和最近任务
+            let statusSnapshot = null;
+            let taskRuns = [];
+            let configSummary = null;
+            const error = null;
+
+            try {
+                const accountData = provider.getAccounts();
+                const account = (accountData.accounts || []).find(a => a.id === accountId);
+                if (account) {
+                    statusSnapshot = {
+                        online: account.online || false,
+                        status: account.status || 'unknown',
+                        lastSeen: account.lastSeen || null,
+                    };
+                }
+            } catch { /* ignore */ }
+
+            try {
+                const { getRecentTaskRuns } = require('../services/task-run-store');
+                taskRuns = getRecentTaskRuns({ accountId, limit: 10 });
+            } catch { /* ignore */ }
+
+            try {
+                const runtimeConfig = getRuntimeConfig();
+                configSummary = {
+                    serverUrl: runtimeConfig.serverUrl,
+                    clientVersion: runtimeConfig.clientVersion,
+                    platform: runtimeConfig.platform,
+                };
+            } catch { /* ignore */ }
+
+            const bundle = diagnosticBundle.generate({
+                accountId, accountName, trigger: trigger || 'manual',
+                taskRuns, statusSnapshot, configSummary, error,
+            });
+
+            auditLog.record({
+                actor: req.currentUser.username,
+                action: 'diagnostic.generate',
+                target: `account:${accountId}`,
+                ip: getClientIp(req),
+            });
+
+            res.json({ ok: true, data: bundle });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    // ============ 策略模板 API（已登录用户） ============
+
+    app.get('/api/strategy-templates', authRequired, (req, res) => {
+        try {
+            res.json({ ok: true, data: { templates: strategyTemplate.listTemplates() } });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    app.get('/api/strategy-templates/:id', authRequired, (req, res) => {
+        try {
+            const template = strategyTemplate.getTemplate(req.params.id);
+            if (!template) return res.status(404).json({ ok: false, error: '模板不存在' });
+            res.json({ ok: true, data: template });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    app.post('/api/strategy-templates', authRequired, (req, res) => {
+        try {
+            const { name, description, configData } = req.body || {};
+            if (!configData) return res.status(400).json({ ok: false, error: '请提供配置数据' });
+            const template = strategyTemplate.saveTemplate(name, description, configData);
+            auditLog.record({
+                actor: req.currentUser.username, action: 'template.save', target: `template:${template.name}`,
+                ip: getClientIp(req),
+            });
+            res.json({ ok: true, data: template });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    app.delete('/api/strategy-templates/:id', authRequired, (req, res) => {
+        try {
+            const template = strategyTemplate.getTemplate(req.params.id);
+            const ok = strategyTemplate.deleteTemplate(req.params.id);
+            if (!ok) return res.status(404).json({ ok: false, error: '模板不存在' });
+            auditLog.record({
+                actor: req.currentUser.username, action: 'template.delete', target: `template:${template?.name || req.params.id}`,
+                ip: getClientIp(req), severity: 'warning',
+            });
+            res.json({ ok: true });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    app.post('/api/strategy-templates/validate', authRequired, (req, res) => {
+        try {
+            const result = strategyTemplate.validateImport(req.body || {});
+            res.json({ ok: true, data: result });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    // ============ 告警规则 API（仅管理员） ============
+
+    app.get('/api/admin/alert-rules', authRequired, adminRequired, (req, res) => {
+        try {
+            const rules = alertRuleEngine.listRules();
+            const triggers = alertRuleEngine.listTriggers({ limit: req.query.limit });
+            res.json({ ok: true, data: { rules, triggers } });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    app.post('/api/admin/alert-rules', authRequired, adminRequired, (req, res) => {
+        try {
+            const rule = alertRuleEngine.createRule({
+                ...req.body,
+                username: req.currentUser.username,
+            });
+            auditLog.record({
+                actor: req.currentUser.username, action: 'alert-rule.create', target: `rule:${rule.name}`,
+                ip: getClientIp(req),
+            });
+            res.json({ ok: true, data: rule });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    app.post('/api/admin/alert-rules/:id/toggle', authRequired, adminRequired, (req, res) => {
+        try {
+            const { enabled } = req.body || {};
+            const rule = alertRuleEngine.toggleRule(req.params.id, enabled);
+            if (!rule) return res.status(404).json({ ok: false, error: '规则不存在' });
+            res.json({ ok: true, data: rule });
+        } catch (error) {
+            handleApiError(res, error);
+        }
+    });
+
+    app.delete('/api/admin/alert-rules/:id', authRequired, adminRequired, (req, res) => {
+        try {
+            const rule = alertRuleEngine.getRule(req.params.id);
+            const ok = alertRuleEngine.deleteRule(req.params.id);
+            if (!ok) return res.status(404).json({ ok: false, error: '规则不存在' });
+            auditLog.record({
+                actor: req.currentUser.username, action: 'alert-rule.delete', target: `rule:${rule?.name || req.params.id}`,
+                ip: getClientIp(req), severity: 'warning',
+            });
+            res.json({ ok: true });
+        } catch (error) {
+            handleApiError(res, error);
+        }
     });
 
     // 保存系统配置
@@ -1853,6 +2189,13 @@ function startAdminServer(dataProvider) {
             const saved = store.setSystemConfig(newConfig);
             updateRuntimeConfig(saved);
             const current = getRuntimeConfig();
+            auditLog.record({
+                actor: req.currentUser.username,
+                action: 'config.update',
+                target: 'system:config',
+                details: newConfig,
+                ip: getClientIp(req),
+            });
             res.json({ ok: true, data: { saved, current } });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
@@ -1866,6 +2209,14 @@ function startAdminServer(dataProvider) {
             store.setSystemConfig(defaultConfig);
             updateRuntimeConfig(defaultConfig);
             const current = getRuntimeConfig();
+            auditLog.record({
+                actor: req.currentUser.username,
+                action: 'config.reset',
+                target: 'system:config',
+                details: defaultConfig,
+                ip: getClientIp(req),
+                severity: 'warning',
+            });
             res.json({ ok: true, data: { saved: defaultConfig, current } });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
@@ -1914,16 +2265,24 @@ function startAdminServer(dataProvider) {
             if (!description || days === undefined) {
                 return res.status(400).json({ ok: false, error: '请提供描述和天数' });
             }
-            
+
             const cardType = type === 'quota' ? 'quota' : 'time';
-            
+
             // 批量创建
             if (count && Number.parseInt(count, 10) > 1) {
                 const cards = userStore.createCardsBatch(description, days, count, cardType);
+                auditLog.record({
+                    actor: req.currentUser.username, action: 'card.create.batch', target: `count:${cards.length}`,
+                    details: { description, days, count, type: cardType }, ip: getClientIp(req),
+                });
                 return res.json({ ok: true, data: cards, batch: true, count: cards.length });
             }
-            
+
             const card = userStore.createCard(description, days, cardType);
+            auditLog.record({
+                actor: req.currentUser.username, action: 'card.create', target: `card:${card.code}`,
+                details: { description, days, type: cardType }, ip: getClientIp(req),
+            });
             res.json({ ok: true, data: card });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
@@ -1938,6 +2297,10 @@ function startAdminServer(dataProvider) {
                 return res.status(400).json({ ok: false, error: '请提供要删除的卡密列表' });
             }
             const result = userStore.deleteCardsBatch(codes);
+            auditLog.record({
+                actor: req.currentUser.username, action: 'card.delete.batch', target: `count:${codes.length}`,
+                details: { codes }, ip: getClientIp(req), severity: 'warning',
+            });
             res.json(result);
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
@@ -1967,6 +2330,10 @@ function startAdminServer(dataProvider) {
             if (!ok) {
                 return res.status(404).json({ ok: false, error: '卡密不存在' });
             }
+            auditLog.record({
+                actor: req.currentUser.username, action: 'card.delete', target: `card:${code}`,
+                ip: getClientIp(req), severity: 'warning',
+            });
             res.json({ ok: true });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
@@ -2129,6 +2496,10 @@ function startAdminServer(dataProvider) {
                     invalidateToken(token);
                 }
             }
+            auditLog.record({
+                actor: currentUser.username, action: 'user.delete', target: `username:${username}`,
+                ip: getClientIp(req), severity: 'danger',
+            });
             res.json({ ok: true });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });

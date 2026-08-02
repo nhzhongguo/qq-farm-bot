@@ -1,4 +1,5 @@
 const { createModuleLogger } = require('./logger');
+const { createRetryPolicy } = require('./retry-policy');
 
 const schedulerLogger = createModuleLogger('scheduler');
 const schedulerRegistry = new Map(); // namespace -> { createdAt, timers: Map<taskName, TaskMeta> }
@@ -34,6 +35,8 @@ function normalizeTaskSnapshot(taskName, meta) {
         runCount: Number(item.runCount) || 0,
         running: !!item.running,
         preventOverlap: item.preventOverlap !== false,
+        retryCount: Number(item.retryCount) || 0,
+        lastError: item.lastError || null,
     };
 }
 
@@ -139,6 +142,9 @@ function createScheduler(namespace = 'default') {
         const delay = Math.max(1, toDelayMs(intervalMs, 1000));
         const preventOverlap = options.preventOverlap !== false;
         const runImmediately = !!options.runImmediately;
+        const retryPolicy = options.retry
+            ? createRetryPolicy(typeof options.retry === 'object' ? options.retry : {})
+            : null;
         const entry = {
             kind: 'interval',
             delayMs: delay,
@@ -148,6 +154,8 @@ function createScheduler(namespace = 'default') {
             runCount: 0,
             running: false,
             preventOverlap,
+            retryCount: 0,
+            lastError: null,
             handle: null,
         };
 
@@ -159,8 +167,20 @@ function createScheduler(namespace = 'default') {
             current.lastRunAt = Date.now();
             current.runCount += 1;
             try {
-                await taskFn();
+                if (retryPolicy) {
+                    await retryPolicy.execute(taskFn, {
+                        label: `${name}/${key}`,
+                        onRetry: (attempt, error) => {
+                            current.retryCount = (current.retryCount || 0) + 1;
+                            current.lastError = error && error.message ? error.message : String(error);
+                        },
+                    });
+                } else {
+                    await taskFn();
+                }
+                current.lastError = null;
             } catch (e) {
+                current.lastError = e && e.message ? e.message : String(e);
                 schedulerLogger.warn(`[${name}] interval 任务执行失败: ${key}`, {
                     module: 'scheduler',
                     scope: name,

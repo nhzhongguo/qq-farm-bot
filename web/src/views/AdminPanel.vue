@@ -5,6 +5,7 @@ import api from '@/api'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseSwitch from '@/components/ui/BaseSwitch.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { useToastStore } from '@/stores/toast'
@@ -13,8 +14,8 @@ import { useUserStore } from '@/stores/user'
 const userStore = useUserStore()
 const toast = useToastStore()
 
-const activeTab = ref<'card' | 'user' | 'log' | 'system'>(
-  (localStorage.getItem('admin-active-tab') as 'card' | 'user' | 'log' | 'system') || 'card',
+const activeTab = ref<'card' | 'user' | 'log' | 'audit' | 'alert' | 'system'>(
+  (localStorage.getItem('admin-active-tab') as 'card' | 'user' | 'log' | 'audit' | 'alert' | 'system') || 'card',
 )
 
 watch(activeTab, (newTab) => {
@@ -25,6 +26,8 @@ const tabs = [
   { key: 'card', label: '卡密', icon: 'i-carbon-ticket' },
   { key: 'user', label: '用户', icon: 'i-carbon-user-admin' },
   { key: 'log', label: '日志', icon: 'i-carbon-document' },
+  { key: 'audit', label: '审计', icon: 'i-carbon-task-approved' },
+  { key: 'alert', label: '告警', icon: 'i-carbon-warning-alt' },
   { key: 'system', label: '系统', icon: 'i-carbon-settings' },
 ] as const
 
@@ -891,6 +894,208 @@ onMounted(() => {
   loadWxConfig()
   fetchCardClaimStatus()
 })
+
+// ========== 审计日志 ==========
+interface AuditEntry {
+  id: string
+  timestamp: number
+  actor: string
+  action: string
+  target: string
+  details: Record<string, any> | null
+  ip: string
+  severity: 'info' | 'warning' | 'danger'
+}
+
+const auditEntries = ref<AuditEntry[]>([])
+const auditLoading = ref(false)
+const auditError = ref('')
+const auditFilterActor = ref('')
+const auditFilterAction = ref('')
+
+// 告警规则状态提前声明，供 watch 引用
+const alertRules = ref<AlertRule[]>([])
+const alertTriggers = ref<AlertTrigger[]>([])
+const alertLoading = ref(false)
+const alertError = ref('')
+const auditFilterSeverity = ref('')
+
+async function fetchAuditLogs() {
+  auditLoading.value = true
+  auditError.value = ''
+  try {
+    const params: Record<string, string> = { limit: '100' }
+    if (auditFilterActor.value)
+      params.actor = auditFilterActor.value
+    if (auditFilterAction.value)
+      params.action = auditFilterAction.value
+    if (auditFilterSeverity.value)
+      params.severity = auditFilterSeverity.value
+    const { data } = await api.get('/api/admin/audit-log', { params })
+    if (data?.ok && data.data) {
+      auditEntries.value = Array.isArray(data.data.entries) ? data.data.entries : []
+    }
+    else {
+      auditError.value = String(data?.error || '无法读取审计日志')
+    }
+  }
+  catch (error: any) {
+    auditError.value = String(error?.response?.data?.error || '无法读取审计日志')
+  }
+  finally {
+    auditLoading.value = false
+  }
+}
+
+function formatAuditTime(ts: number) {
+  if (!ts)
+    return '-'
+  return new Date(ts).toLocaleString('zh-CN', { hour12: false })
+}
+
+function severityClass(sev: string) {
+  if (sev === 'danger')
+    return 'text-red-600 dark:text-red-400'
+  if (sev === 'warning')
+    return 'text-amber-600 dark:text-amber-400'
+  return 'text-gray-600 dark:text-gray-400'
+}
+
+function severityLabel(sev: string) {
+  if (sev === 'danger')
+    return '危险'
+  if (sev === 'warning')
+    return '警告'
+  return '常规'
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'audit' && !auditEntries.value.length) {
+    fetchAuditLogs()
+  }
+  if (tab === 'alert' && !alertRules.value.length) {
+    fetchAlertRules()
+  }
+})
+
+// ========== 告警规则 ==========
+interface AlertRule {
+  id: string
+  name: string
+  description: string
+  condition: string
+  threshold: number
+  channel: string
+  endpoint: string
+  enabled: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+interface AlertTrigger {
+  id: string
+  ruleId: string
+  ruleName: string
+  condition: string
+  threshold: number
+  actualValue: number
+  username: string
+  triggeredAt: number
+  channel: string
+}
+
+const showAlertRuleModal = ref(false)
+const newAlertRule = ref({
+  name: '',
+  description: '',
+  condition: 'consecutive_failures',
+  threshold: 3,
+  channel: 'log',
+  endpoint: '',
+})
+
+const conditionLabels: Record<string, string> = {
+  consecutive_failures: '连续失败次数',
+  offline_duration: '离线时长（秒）',
+  task_error_count: '任务错误总数',
+}
+
+const channelLabels: Record<string, string> = {
+  webhook: 'Webhook',
+  log: '系统日志',
+}
+
+async function fetchAlertRules() {
+  alertLoading.value = true
+  alertError.value = ''
+  try {
+    const { data } = await api.get('/api/admin/alert-rules')
+    if (data?.ok && data.data) {
+      alertRules.value = Array.isArray(data.data.rules) ? data.data.rules : []
+      alertTriggers.value = Array.isArray(data.data.triggers) ? data.data.triggers : []
+    }
+    else {
+      alertError.value = String(data?.error || '无法读取告警规则')
+    }
+  }
+  catch (error: any) {
+    alertError.value = String(error?.response?.data?.error || '无法读取告警规则')
+  }
+  finally {
+    alertLoading.value = false
+  }
+}
+
+async function createAlertRule() {
+  if (!newAlertRule.value.name.trim()) {
+    toast.error('请输入规则名称')
+    return
+  }
+  try {
+    await api.post('/api/admin/alert-rules', newAlertRule.value)
+    toast.success('规则已创建')
+    showAlertRuleModal.value = false
+    newAlertRule.value = {
+      name: '',
+      description: '',
+      condition: 'consecutive_failures',
+      threshold: 3,
+      channel: 'log',
+      endpoint: '',
+    }
+    await fetchAlertRules()
+  }
+  catch (error: any) {
+    toast.error(error?.response?.data?.error || '创建失败')
+  }
+}
+
+async function toggleAlertRule(id: string, enabled: boolean) {
+  try {
+    await api.post(`/api/admin/alert-rules/${id}/toggle`, { enabled })
+    await fetchAlertRules()
+  }
+  catch (error: any) {
+    toast.error(error?.response?.data?.error || '操作失败')
+  }
+}
+
+async function deleteAlertRule(id: string) {
+  try {
+    await api.delete(`/api/admin/alert-rules/${id}`)
+    toast.success('规则已删除')
+    await fetchAlertRules()
+  }
+  catch (error: any) {
+    toast.error(error?.response?.data?.error || '删除失败')
+  }
+}
+
+function formatAlertTime(ts: number) {
+  if (!ts)
+    return '-'
+  return new Date(ts).toLocaleString('zh-CN', { hour12: false })
+}
 </script>
 
 <template>
@@ -1562,6 +1767,199 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- 审计日志 -->
+        <div v-else-if="activeTab === 'audit'" class="space-y-4">
+          <div class="ds-surface p-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <h3 class="text-base font-semibold">
+                操作审计
+              </h3>
+              <div class="ml-auto flex flex-wrap items-center gap-2">
+                <BaseInput
+                  v-model="auditFilterActor"
+                  placeholder="操作者"
+                  class="w-32"
+                  @keyup.enter="fetchAuditLogs"
+                />
+                <BaseInput
+                  v-model="auditFilterAction"
+                  placeholder="操作类型"
+                  class="w-36"
+                  @keyup.enter="fetchAuditLogs"
+                />
+                <BaseSelect
+                  v-model="auditFilterSeverity"
+                  class="w-28"
+                >
+                  <option value="">
+                    全部级别
+                  </option>
+                  <option value="info">
+                    常规
+                  </option>
+                  <option value="warning">
+                    警告
+                  </option>
+                  <option value="danger">
+                    危险
+                  </option>
+                </BaseSelect>
+                <BaseButton size="sm" :loading="auditLoading" @click="fetchAuditLogs">
+                  刷新
+                </BaseButton>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="auditError" class="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
+            {{ auditError }}
+          </div>
+          <div v-else-if="!auditLoading && !auditEntries.length" class="ds-surface p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            暂无审计记录
+          </div>
+          <div v-else-if="auditEntries.length" class="ds-surface overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="border-b bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-medium">
+                      时间
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      操作者
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      操作
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      目标
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      级别
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      IP
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <tr v-for="entry in auditEntries" :key="entry.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <td class="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {{ formatAuditTime(entry.timestamp) }}
+                    </td>
+                    <td class="px-4 py-3 font-medium">
+                      {{ entry.actor }}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {{ entry.action }}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {{ entry.target }}
+                    </td>
+                    <td class="px-4 py-3">
+                      <span :class="severityClass(entry.severity)">{{ severityLabel(entry.severity) }}</span>
+                    </td>
+                    <td class="px-4 py-3 text-gray-500 dark:text-gray-500">
+                      {{ entry.ip || '-' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 告警规则 -->
+        <div v-else-if="activeTab === 'alert'" class="space-y-4">
+          <div class="ds-surface p-4">
+            <div class="flex items-center gap-3">
+              <h3 class="text-base font-semibold">
+                告警规则
+              </h3>
+              <div class="ml-auto">
+                <BaseButton size="sm" @click="showAlertRuleModal = true">
+                  新建规则
+                </BaseButton>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="alertError" class="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
+            {{ alertError }}
+          </div>
+
+          <div v-if="alertRules.length" class="ds-surface overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="border-b bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+                  <tr>
+                    <th class="px-4 py-3 text-left font-medium">
+                      名称
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      条件
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      阈值
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      通道
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      状态
+                    </th>
+                    <th class="px-4 py-3 text-left font-medium">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <tr v-for="rule in alertRules" :key="rule.id" class="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <td class="px-4 py-3 font-medium">
+                      {{ rule.name }}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {{ conditionLabels[rule.condition] || rule.condition }}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {{ rule.threshold }}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      {{ channelLabels[rule.channel] || rule.channel }}
+                    </td>
+                    <td class="px-4 py-3">
+                      <BaseSwitch
+                        :model-value="rule.enabled"
+                        @update:model-value="(val: boolean | undefined) => toggleAlertRule(rule.id, val === true)"
+                      />
+                    </td>
+                    <td class="px-4 py-3">
+                      <BaseButton size="sm" variant="danger" @click="deleteAlertRule(rule.id)">
+                        删除
+                      </BaseButton>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div v-if="alertTriggers.length" class="ds-surface p-4">
+            <h4 class="mb-3 text-sm font-medium">
+              最近触发记录
+            </h4>
+            <div class="space-y-2">
+              <div v-for="trigger in alertTriggers" :key="trigger.id" class="flex items-center justify-between border-b pb-2 text-sm dark:border-gray-700">
+                <div>
+                  <span class="font-medium">{{ trigger.ruleName }}</span>
+                  <span class="ml-2 text-gray-500">触发值: {{ trigger.actualValue }} / 阈值: {{ trigger.threshold }}</span>
+                </div>
+                <span class="text-gray-500">{{ formatAlertTime(trigger.triggeredAt) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 系统配置 -->
         <div v-else-if="activeTab === 'system'" class="space-y-4">
           <h3 class="text-lg text-gray-900 font-bold dark:text-gray-100">
@@ -1742,7 +2140,7 @@ onMounted(() => {
                   :placeholder="wxApiKeyConfigured ? '留空以保留当前密钥' : '可选，用于代理模式'"
                   class="col-span-2"
                 />
-                <p class="col-span-2 -mt-2 text-xs text-[var(--color-text-secondary)]">
+                <p class="col-span-2 text-xs text-[var(--color-text-secondary)] -mt-2">
                   当前密钥状态：{{ wxApiKeyHint }}
                 </p>
                 <BaseInput
@@ -1796,6 +2194,72 @@ onMounted(() => {
       @confirm="modalVisible = false"
       @cancel="modalVisible = false"
     />
+
+    <!-- 新建告警规则弹窗 -->
+    <div v-if="showAlertRuleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showAlertRuleModal = false">
+      <div class="ds-surface max-w-md w-full p-6">
+        <h3 class="mb-4 text-lg font-bold">
+          新建告警规则
+        </h3>
+        <div class="space-y-3">
+          <BaseInput
+            v-model="newAlertRule.name"
+            label="规则名称"
+            placeholder="如：连续失败3次告警"
+          />
+          <BaseInput
+            v-model="newAlertRule.description"
+            label="描述"
+            placeholder="可选"
+          />
+          <BaseSelect
+            v-model="newAlertRule.condition"
+            label="条件类型"
+          >
+            <option value="consecutive_failures">
+              连续失败次数
+            </option>
+            <option value="offline_duration">
+              离线时长（秒）
+            </option>
+            <option value="task_error_count">
+              任务错误总数
+            </option>
+          </BaseSelect>
+          <BaseInput
+            v-model.number="newAlertRule.threshold"
+            type="number"
+            label="阈值"
+            placeholder="如：3"
+          />
+          <BaseSelect
+            v-model="newAlertRule.channel"
+            label="告警通道"
+          >
+            <option value="log">
+              系统日志
+            </option>
+            <option value="webhook">
+              Webhook
+            </option>
+          </BaseSelect>
+          <BaseInput
+            v-if="newAlertRule.channel === 'webhook'"
+            v-model="newAlertRule.endpoint"
+            label="Webhook URL"
+            placeholder="https://example.com/hook"
+          />
+        </div>
+        <div class="mt-4 flex justify-end gap-2">
+          <BaseButton variant="secondary" size="sm" @click="showAlertRuleModal = false">
+            取消
+          </BaseButton>
+          <BaseButton variant="primary" size="sm" @click="createAlertRule">
+            创建
+          </BaseButton>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
