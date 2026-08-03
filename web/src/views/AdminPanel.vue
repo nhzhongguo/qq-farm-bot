@@ -28,7 +28,7 @@ const tabs = [
   { key: 'log', label: '日志', icon: 'i-carbon-document' },
   { key: 'audit', label: '审计', icon: 'i-carbon-task-approved' },
   { key: 'alert', label: '告警', icon: 'i-carbon-warning-alt' },
-  { key: 'announcement', label: '公告', icon: 'i-carbon-megaphone' },
+  { key: 'announcement', label: '公告', icon: 'i-carbon-bullhorn' },
   { key: 'system', label: '系统', icon: 'i-carbon-settings' },
 ] as const
 
@@ -2325,7 +2325,7 @@ function clearAnnouncement() {
             <div class="flex items-start justify-between gap-3">
               <div>
                 <h4 class="flex items-center gap-2 text-base text-gray-900 font-bold dark:text-gray-100">
-                  <div class="i-carbon-megaphone" />
+                  <div class="i-carbon-bullhorn" />
                   登录公告
                 </h4>
                 <p class="mt-1 text-xs text-[var(--color-text-secondary)]">

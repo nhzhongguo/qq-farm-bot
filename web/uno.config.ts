@@ -38,6 +38,8 @@ export default defineConfig({
       },
     }),
     presetWebFonts({
+      // 离线构建：本地缓存字体，不依赖网络拉取（网络不可用时避免 build 失败）
+      provider: 'none',
       fonts: {
         sans: 'DM Sans',
         mono: 'DM Mono',

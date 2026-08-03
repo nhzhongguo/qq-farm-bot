@@ -15,9 +15,9 @@ test('release manifest matches every package version and describes the upgrade',
     const corePackage = readJson('core/package.json');
     const webPackage = readJson('web/package.json');
 
-    assert.equal(manifest.version, '2.4.0');
-    assert.match(manifest.build, /^20260802$/);
-    assert.match(manifest.upgrade, /商业级|可观测|质量门/);
+    assert.equal(manifest.version, '2.5.0');
+    assert.match(manifest.build, /^20260803$/);
+    assert.match(manifest.upgrade, /告警|推送|收益/);
     assert.equal(rootPackage.version, manifest.version);
     assert.equal(corePackage.version, manifest.version);
     assert.equal(webPackage.version, manifest.version);
@@ -42,5 +42,5 @@ test('release.js validates version consistency across manifest and packages', ()
     assert.match(releaseScript, /web\/package\.json/);
     assert.match(releaseScript, /git tag/);
     // version.json 仍是单一事实源
-    assert.equal(manifest.version, '2.4.0');
+    assert.equal(manifest.version, '2.5.0');
 });

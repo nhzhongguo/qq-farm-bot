@@ -48,8 +48,8 @@ test.describe('frontend auth smoke', () => {
   test('login page renders core controls', async ({ page }) => {
     await page.goto('/login')
     await expect(page).toHaveURL(/\/login/)
-    await expect(page.getByText('用户名')).toBeVisible()
-    await expect(page.getByText('密码')).toBeVisible()
+    await expect(page.getByText('用户名').first()).toBeVisible()
+    await expect(page.getByText('密码').first()).toBeVisible()
     await expect(page.getByRole('button', { name: /登录|立即登录|注册/ }).first()).toBeVisible()
   })
 

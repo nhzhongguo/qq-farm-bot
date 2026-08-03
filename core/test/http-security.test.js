@@ -200,7 +200,7 @@ test('runtime doctor is admin-only and does not expose local paths', async () =>
 
     assert.equal(reportRes.status, 200);
     assert.equal(reportRes.json?.ok, true);
-    assert.equal(reportRes.json?.data?.version, '2.4.0');
+    assert.equal(reportRes.json?.data?.version, '2.5.0');
     assert.equal(Array.isArray(reportRes.json?.data?.checks), true);
     assert.doesNotMatch(JSON.stringify(reportRes.json), /qq-farm-http-test/);
 });

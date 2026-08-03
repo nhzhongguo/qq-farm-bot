@@ -3,12 +3,13 @@ import axios from 'axios'
 import NProgress from 'nprogress'
 import { createRouter, createWebHistory } from 'vue-router'
 import { menuRoutes } from './menu'
+import { useJsonStorage } from '@/utils/storage'
 import 'nprogress/nprogress.css'
 
 NProgress.configure({ showSpinner: false })
 
 const adminToken = useStorage('admin_token', '')
-const userInfo = useStorage<{ mustChangePassword?: boolean, role?: string } | null>('user_info', null)
+const userInfo = useJsonStorage<{ mustChangePassword?: boolean, role?: string }>('user_info')
 let validatedToken = ''
 let validatingPromise: Promise<boolean> | null = null
 

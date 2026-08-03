@@ -2,6 +2,7 @@ import { useStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 import api from '@/api'
+import { useJsonStorage } from '@/utils/storage'
 
 export interface UserCard {
   code: string
@@ -48,7 +49,7 @@ export interface Card {
 
 export const useUserStore = defineStore('user', () => {
   const token = useStorage('admin_token', '')
-  const userInfo = useStorage<User | null>('user_info', null)
+  const userInfo = useJsonStorage<User>('user_info')
   const isLoggedIn = computed(() => !!token.value)
   const isAdmin = computed(() => userInfo.value?.role === 'admin')
   const username = computed(() => userInfo.value?.username || '')
