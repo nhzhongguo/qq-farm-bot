@@ -1,19 +1,31 @@
 # QQ农场智能助手
 
-QQ农场智能助手是一套持续维护的多账号自动化管理系统，由 Node.js 后端、Vue Web 面板和独立账号 Worker 组成。项目面向长期运行场景，重点处理账号隔离、自动化任务、实时状态、运行日志、数据安全和版本回退。
+QQ农场智能助手是一套持续维护的多账号自动化管理系统，由 Node.js 后端、Vue Web 面板和独立账号 Worker 组成。项目面向长期运行场景，重点处理账号隔离、自动化任务、实时状态、运行日志、数据安全、版本回退与多渠道告警。
 
-当前开发版本：`v2.4.0`
+当前开发版本：`v2.5.0`（build `20260803`）
 
 仓库地址：<https://github.com/nhzhongguo/qq-farm-automation-bot-private>
 
-原项目地址：<https://github.com/cxw521/qq-farm-automation-bot>（本项目基于该上游项目二次开发与持续维护）
+原项目地址：<https://github.com/cxw521/qq-farm-automation-bot>（本项目基于该上游项目二次开发与持续维护，功能已全面覆盖并持续扩展）
+
+## v2.5.0 升级亮点
+
+- **多渠道告警推送（19 渠道）**：接入 pushoo，支持 qmsg、Server酱、PushPlus、钉钉、企业微信、Bark、Telegram、飞书、Discord 等推送渠道，可在告警规则与“测试推送”中直接使用。
+- **收益统计页**：金币 / 经验 / 操作数 7 / 30 / 90 天趋势曲线，自绘 SVG 无新增依赖，基于每日统计历史自动归档（保留 90 天）。
+- **公告管理**：管理员可编辑登录公告内容，支持“仅展示一次”，用户登录后弹窗展示。
+- **卡密消费流水**：记录卡密注册激活、续费使用与领取操作，管理后台可视化查看、按类型过滤、支持清空。
+- **性能优化**：JSON 存储写入合并（debounce，进程退出统一 flush）、作物排名 5 分钟内存缓存、WebSocket 日志推送 200ms 节流合并。
+- **质量门升级**：单元测试 130 项全部通过；新增 Playwright E2E 11 项（管理后台、认证冒烟、调度页移动端）。
+- **修复**：`user_info` 本地存储序列化问题（刷新后管理员角色丢失、`/admin` 被重定向回概览页），现显式 JSON 序列化并兼容历史脏数据。
+
+历史版本变更详见 [`CHANGELOG.md`](./CHANGELOG.md) 与 [`docs/upgrade-plan-v2.5.md`](./docs/upgrade-plan-v2.5.md)。
 
 ## 功能概览
 
 ### 账号与用户
 
 - 支持 QQ Code 和微信登录服务接入。
-- 支持多账号新增、编辑、启动、停止和删除。
+- 支持多账号新增、编辑、启动、停止和删除，支持账号 JSON 批量导入导出。
 - 支持管理员与普通用户、账号额度、卡密续期和用户隔离。
 - 服务重启后不会自动启动全部农场账号，需在面板中手动确认启动。
 - 默认管理员首次登录后必须修改密码。
@@ -36,10 +48,12 @@ QQ农场智能助手是一套持续维护的多账号自动化管理系统，由
 
 ### 面板与运维
 
-- 概览、个人、好友、分析、设置和后台管理页面。
-- 实时状态、运行日志、账号日志和 Socket.IO 推送。
+- 概览、个人、好友、分析、统计、调度和后台管理页面。
+- 实时状态、运行日志、账号日志、任务历史与 Socket.IO 推送。
 - 用户、卡密、公告、系统参数和微信登录配置管理。
-- 下线提醒、Webhook 和多种推送渠道。
+- 告警规则引擎（连续失败 / 离线时长 / 任务错误数），支持 19 种推送渠道。
+- 操作审计日志、失败诊断包、卡密消费流水。
+- 批量启停、重试策略、Runtime Doctor 健康自检。
 - 明暗主题与响应式页面。
 
 ### 数据安全
@@ -50,12 +64,13 @@ QQ农场智能助手是一套持续维护的多账号自动化管理系统，由
 - 数据文件自动生成 `.bak`，主文件损坏时优先恢复备份。
 - 卡密领取采用 IP 与客户端标识组合限制，并在领取后预留卡密。
 - 微信代理密钥只保存在后端，不下发到普通用户浏览器。
+- 审计日志与诊断包统一敏感字段脱敏规则。
 
 ## 技术栈
 
 - 后端：Node.js、Express、Socket.IO、WebSocket、Protobuf。
 - 前端：Vue 3、TypeScript、Pinia、Vue Router、UnoCSS、Vite。
-- 工程：pnpm workspace、Node Test Runner、ESLint、Docker Compose。
+- 工程：pnpm workspace、Node Test Runner、ESLint、Docker Compose、Playwright E2E。
 - 数据：本地 JSON 文件和自动备份，不依赖外部数据库。
 
 ## 运行要求
@@ -166,7 +181,7 @@ Windows 备份示例：
 
 ```powershell
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-Copy-Item .\core\data ".\backup-$stamp" -Recurse
+Copy-Item .\core\data ".ackup-$stamp" -Recurse
 ```
 
 恢复时先停止服务，再将备份数据复制回 `core/data/`。不要在服务运行期间覆盖数据文件。
@@ -174,7 +189,7 @@ Copy-Item .\core\data ".\backup-$stamp" -Recurse
 ## 开发与验证
 
 ```bash
-# 后端回归测试
+# 后端回归测试（v2.5.0：130 项全部通过）
 pnpm test
 
 # 只读代码规范检查（不会修改工作区）
@@ -186,8 +201,8 @@ pnpm lint:fix
 # 前端类型检查和生产构建
 pnpm build
 
-# Playwright 认证冒烟测试（先完成 pnpm build:web）
-pnpm test:e2e:smoke
+# Playwright E2E（先完成 pnpm build:web）
+pnpm test:e2e
 
 # 生产依赖安全审计
 pnpm audit --prod
@@ -195,7 +210,7 @@ pnpm audit --prod
 
 GitHub Actions 质量门位于 `.github/workflows/ci.yml`，固定 Node.js `20.19.0` 和 pnpm `10.30.2`，使用冻结锁文件安装、只读 Lint、前端构建和 Playwright 冒烟测试。工作流仅验证代码，不包含发布、推送或密钥配置。
 
-每次正式发布至少需要满足：测试通过、Lint 通过、构建通过、依赖审计无已知漏洞、面板可以正常访问。
+每次正式发布至少需要满足：测试通过、Lint 通过、构建通过、依赖审计无已知漏洞、面板可以正常访问。版本发布可执行 `node scripts/release.js` 自动校验版本一致性、更新构建时间戳并生成发布摘要。
 
 ## 项目结构
 
@@ -206,13 +221,16 @@ GitHub Actions 质量门位于 `.github/workflows/ci.yml`，固定 Node.js `20.1
 |   |-- src/core/         单账号运行逻辑
 |   |-- src/models/       用户、账号和配置持久化
 |   |-- src/runtime/      Worker 生命周期与数据提供层
-|   |-- src/services/     农场、好友、商城、任务等业务服务
+|   |-- src/services/     农场、好友、商城、任务、告警等业务服务
 |   |-- test/             后端回归测试
 |   `-- data/             本地运行数据，不提交 Git
 |-- web/                   Vue Web 面板
 |   |-- src/components/   页面组件
 |   |-- src/stores/       Pinia 状态管理
-|   `-- src/views/        业务页面
+|   |-- src/views/        业务页面（含统计、调度页）
+|   `-- e2e/              Playwright 端到端测试
+|-- docs/                 升级方案与升级报告
+|-- scripts/              发布、分析与运维脚本
 |-- docker-compose.yml
 |-- pnpm-workspace.yaml
 `-- CHANGELOG.md
@@ -268,6 +286,7 @@ pnpm build
 - 登录/注册/卡密领取接口已启用 IP 级限流，降低暴力尝试风险。
 - 首次登录后立即修改默认管理员密码。
 - 不要将 `core/data/`、登录 Code、卡密、API Key 或日志上传到公共仓库。
+- 告警推送配置中的 token 类字段会沿用脱敏规则，不会在审计日志与诊断包中输出原始凭据。
 - 公网部署时使用 HTTPS、可信反向代理和防火墙访问控制。
 - 只有在反向代理会清理伪造转发头时才启用 `TRUST_PROXY`。
 - 更新或回退前同时保留代码标签和本地数据备份。
