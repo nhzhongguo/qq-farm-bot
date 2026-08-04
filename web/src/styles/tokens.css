@@ -46,6 +46,12 @@
   --color-info: #0284c7;
   --color-info-soft: rgba(2, 132, 199, 0.12);
 
+  /* Chart / visualization palette (light) */
+  --color-chart-gold: #f59e0b;
+  --color-chart-purple: #a855f7;
+  --color-chart-green: #22c55e;
+  --color-chart-blue: #3b82f6;
+  --color-chart-red: #e11d48;
   /* Legacy aliases used across the app */
   --theme-bg: var(--color-bg-app);
   --theme-text: var(--color-text-primary);
@@ -99,6 +105,13 @@
 
   --color-border-default: rgba(148, 163, 184, 0.18);
   --color-border-strong: rgba(148, 163, 184, 0.32);
+  /* Chart palette (dark) */
+  --color-chart-gold: #fbbf24;
+  --color-chart-purple: #c084fc;
+  --color-chart-green: #4ade80;
+  --color-chart-blue: #60a5fa;
+  --color-chart-red: #fb7185;
+
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.28);

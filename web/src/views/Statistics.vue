@@ -190,11 +190,11 @@ function formatAxis(value: number) {
             <span class="text-xs text-gray-400">累计余额与每日增量</span>
           </div>
           <div class="flex flex-wrap items-start gap-1">
-            <svg viewBox="0 0 560 160" class="w-full max-w-full min-w-0 flex-1" preserveAspectRatio="none" style="height: 180px">
+            <svg viewBox="0 0 560 160" class="chart-svg w-full max-w-full min-w-0 flex-1" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="goldArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25" />
-                  <stop offset="100%" stop-color="#f59e0b" stop-opacity="0" />
+                  <stop offset="0%" stop-color="var(--color-chart-gold)" stop-opacity="0.25" />
+                  <stop offset="100%" stop-color="var(--color-chart-gold)" stop-opacity="0" />
                 </linearGradient>
               </defs>
               <g v-if="points.length">
@@ -202,7 +202,7 @@ function formatAxis(value: number) {
                 <polyline
                   :points="buildPolyline(points.map(p => p.gold)).points"
                   fill="none"
-                  stroke="#f59e0b"
+                  stroke="var(--color-chart-gold)"
                   stroke-width="2"
                   stroke-linejoin="round"
                   stroke-linecap="round"
@@ -225,11 +225,11 @@ function formatAxis(value: number) {
             </h3>
             <span class="text-xs text-gray-400">累计经验与每日增量</span>
           </div>
-          <svg viewBox="0 0 560 160" class="w-full" preserveAspectRatio="none" style="height: 180px">
+          <svg viewBox="0 0 560 160" class="chart-svg w-full" preserveAspectRatio="none">
             <defs>
               <linearGradient id="expArea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#a855f7" stop-opacity="0.25" />
-                <stop offset="100%" stop-color="#a855f7" stop-opacity="0" />
+                <stop offset="0%" stop-color="var(--color-chart-purple)" stop-opacity="0.25" />
+                <stop offset="100%" stop-color="var(--color-chart-purple)" stop-opacity="0" />
               </linearGradient>
             </defs>
             <g v-if="points.length">
@@ -237,7 +237,7 @@ function formatAxis(value: number) {
               <polyline
                 :points="buildPolyline(points.map(p => p.exp)).points"
                 fill="none"
-                stroke="#a855f7"
+                stroke="var(--color-chart-purple)"
                 stroke-width="2"
                 stroke-linejoin="round"
                 stroke-linecap="round"
@@ -259,7 +259,7 @@ function formatAxis(value: number) {
             </h3>
             <span class="text-xs text-gray-400">收获/种植/偷菜/任务等操作合计</span>
           </div>
-          <svg viewBox="0 0 560 160" class="w-full" preserveAspectRatio="none" style="height: 180px">
+          <svg viewBox="0 0 560 160" class="chart-svg w-full" preserveAspectRatio="none">
             <g v-if="totalOperations.length">
               <rect
                 v-for="(value, index) in totalOperations"
@@ -268,7 +268,7 @@ function formatAxis(value: number) {
                 :y="160 - Math.max(value, 1) / Math.max(...totalOperations, 1) * 150"
                 :width="Math.max(560 / Math.max(totalOperations.length, 1) - 4, 1)"
                 :height="Math.max(value, 1) / Math.max(...totalOperations, 1) * 150"
-                fill="rgba(34,197,94,0.55)"
+                fill="color-mix(in srgb, var(--color-chart-green) 55%, transparent)"
                 rx="1"
               />
             </g>
@@ -282,3 +282,15 @@ function formatAxis(value: number) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.chart-svg {
+  height: 180px;
+}
+
+@media (max-width: 640px) {
+  .chart-svg {
+    height: 120px;
+  }
+}
+</style>

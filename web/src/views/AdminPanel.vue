@@ -1315,7 +1315,7 @@ function clearAnnouncement() {
 
     <div class="border border-gray-200 rounded-lg bg-white shadow dark:border-gray-700 dark:bg-gray-800">
       <div class="border-b border-gray-200 dark:border-gray-700">
-        <nav class="flex gap-1 p-2">
+        <nav class="flex gap-1 overflow-x-auto p-2 scrollbar-none">
           <button
             v-for="tab in tabs"
             :key="tab.key"

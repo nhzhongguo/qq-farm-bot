@@ -1034,11 +1034,11 @@ async function copyToken() {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.3);
+  background-color: color-mix(in srgb, var(--color-text-secondary) 18%, transparent);
   border-radius: 2px;
 }
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5);
+  background-color: color-mix(in srgb, var(--color-text-secondary) 30%, transparent);
 }
 
 /* Active router link styling */
