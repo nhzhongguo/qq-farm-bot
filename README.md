@@ -4,7 +4,7 @@ QQ农场智能助手是一套持续维护的多账号自动化管理系统，由
 
 当前开发版本：`v2.5.0`（build `20260803`）
 
-仓库地址：<https://github.com/nhzhongguo/qq-farm-automation-bot-private>
+仓库地址：<https://github.com/nhzhongguo/qq-farm-bot>
 
 原项目地址：<https://github.com/cxw521/qq-farm-automation-bot>（本项目基于该上游项目二次开发与持续维护，功能已全面覆盖并持续扩展）
 
@@ -85,8 +85,8 @@ QQ农场智能助手是一套持续维护的多账号自动化管理系统，由
 ### Windows PowerShell
 
 ```powershell
-git clone https://github.com/nhzhongguo/qq-farm-automation-bot-private.git
-cd qq-farm-automation-bot-private
+git clone https://github.com/nhzhongguo/qq-farm-bot.git
+cd qq-farm-bot
 
 corepack enable
 corepack prepare pnpm@10.30.2 --activate
@@ -105,8 +105,8 @@ pnpm dev:core
 ### Linux
 
 ```bash
-git clone https://github.com/nhzhongguo/qq-farm-automation-bot-private.git
-cd qq-farm-automation-bot-private
+git clone https://github.com/nhzhongguo/qq-farm-bot.git
+cd qq-farm-bot
 
 corepack enable
 corepack prepare pnpm@10.30.2 --activate
