@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/cover.png" alt="QQ Farm Bot 封面" width="100%">
+</p>
+
 # 🌾 QQ Farm Bot
 
 > 多账号 QQ 农场自动化托管平台 —— 挂机 · 看板 · 告警 · 运维，一套自托管方案全搞定。
