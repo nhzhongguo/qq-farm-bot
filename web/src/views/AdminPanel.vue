@@ -1317,6 +1317,18 @@ function clearAnnouncement() {
   announcementSavedAt.value = 0
   toast.success('已清空输入，保存后公告将停用')
 }
+
+/** Simple Markdown to HTML */
+function renderMarkdown(text: string) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong></strong>')
+    .replace(/\n/g, '<br>')
+    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="" target="_blank" rel="noopener" class="text-blue-500 underline"></a>')
+}
 </script>
 
 <template>
@@ -1325,7 +1337,7 @@ function clearAnnouncement() {
 
     <div class="border border-gray-200 rounded-lg bg-white shadow dark:border-gray-700 dark:bg-gray-800">
       <div class="border-b border-gray-200 dark:border-gray-700">
-        <nav class="flex gap-1 overflow-x-auto p-2 scrollbar-none">
+        <nav class="scrollbar-none flex gap-1 overflow-x-auto p-2">
           <button
             v-for="tab in tabs"
             :key="tab.key"
@@ -1673,7 +1685,7 @@ function clearAnnouncement() {
                 </p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
-                <div class="flex overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600">
+                <div class="flex overflow-hidden border border-gray-200 rounded-lg dark:border-gray-600">
                   <button
                     v-for="option in (['all', 'register', 'renew', 'claim'] as const)"
                     :key="option"
@@ -2354,13 +2366,13 @@ function clearAnnouncement() {
             </div>
 
             <div class="mt-4">
-              <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label class="mb-1 block text-sm text-gray-700 font-medium dark:text-gray-300">
                 公告内容
               </label>
               <textarea
                 v-model="announcementContent"
                 rows="6"
-                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-[var(--theme-primary)] focus:ring-2 focus:ring-[var(--theme-primary)]/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                class="w-full border border-gray-300 rounded-lg bg-white px-3 py-2 text-sm text-gray-900 outline-none dark:border-gray-600 focus:border-[var(--theme-primary)] dark:bg-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[var(--theme-primary)]/30"
                 placeholder="例如：欢迎使用 QQ 农场自动化助手，最新版本 v2.5.0 已发布，新增公告管理、告警推送等功能…"
               />
             </div>
@@ -2370,7 +2382,7 @@ function clearAnnouncement() {
                 <input
                   v-model="announcementShowOnce"
                   type="checkbox"
-                  class="h-4 w-4 rounded border-gray-300 text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
+                  class="h-4 w-4 border-gray-300 rounded text-[var(--theme-primary)] focus:ring-[var(--theme-primary)]"
                 >
                 仅展示一次（用户标记已读后不再弹出）
               </label>
@@ -2398,13 +2410,13 @@ function clearAnnouncement() {
               <div class="i-carbon-view" />
               预览效果
             </h4>
-            <p class="mt-1 mb-3 text-xs text-[var(--color-text-secondary)]">
+            <p class="mb-3 mt-1 text-xs text-[var(--color-text-secondary)]">
               以下为登录后公告弹窗的展示样式。
             </p>
-            <div v-if="announcementContent.trim()" class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
-              <p class="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
-                {{ announcementContent }}
-              </p>
+            <div v-if="announcementContent.trim()" class="border border-gray-200 rounded-lg bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
+              <div class="prose prose-sm max-w-none text-gray-800 dark:text-gray-200">
+                <div v-html="renderMarkdown(announcementContent)" />
+              </div>
               <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
                 —— {{ announcementShowOnce ? '仅展示一次，阅读后自动隐藏' : '每次登录展示' }}
               </p>
