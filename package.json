@@ -29,5 +29,9 @@
     "release:bump": "node scripts/release.js --bump",
     "test:e2e": "pnpm -C web test:e2e",
     "test:e2e:smoke": "pnpm -C web test:e2e e2e/auth-smoke.spec.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nhzhongguo/qq-farm-automation-bot-private.git"
   }
 }

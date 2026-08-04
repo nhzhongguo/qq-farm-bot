@@ -6,6 +6,8 @@ QQ农场智能助手是一套持续维护的多账号自动化管理系统，由
 
 仓库地址：<https://github.com/nhzhongguo/qq-farm-automation-bot-private>
 
+原项目地址：<https://github.com/cxw521/qq-farm-automation-bot>（本项目基于该上游项目二次开发与持续维护）
+
 ## 功能概览
 
 ### 账号与用户
