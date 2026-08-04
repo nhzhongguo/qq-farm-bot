@@ -181,7 +181,7 @@ function getPlantSizeText(land: any) {
   width: 80%;
   margin: 0 auto;
   height: 8px;
-  background: linear-gradient(145deg, #f0f0f0, #e6e6e6);
+  background: var(--color-bg-subtle);
   border-radius: 10px;
   overflow: hidden;
   box-shadow:
