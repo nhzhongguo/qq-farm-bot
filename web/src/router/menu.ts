@@ -44,6 +44,13 @@ export const menuRoutes: MenuItem[] = [
     component: () => import('@/views/Statistics.vue'),
   },
   {
+    path: 'report',
+    name: 'report',
+    label: '报表',
+    icon: 'i-carbon-report',
+    component: () => import('@/views/Report.vue'),
+  },
+  {
     path: 'scheduler',
     name: 'scheduler',
     label: '调度',
