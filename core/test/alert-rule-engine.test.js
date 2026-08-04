@@ -90,7 +90,7 @@ test('evaluate delivers triggers via callback for non-log channels', async () =>
 
 test('evaluate does not deliver for log channel', async () => {
     const isolated = createAlertRuleEngine({ filePath: path.join(dataDir, 'alert_log_only.json'), now: () => 2000000 });
-    const rule = isolated.createRule({
+    isolated.createRule({
         name: '日志不投递', condition: 'consecutive_failures', threshold: 1, channel: 'log',
     });
     let delivered = 0;

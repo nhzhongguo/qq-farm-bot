@@ -576,7 +576,7 @@ function registerUser(username, password, cardCode) {
         action: 'register',
         username: newUser.username,
         cardCode: card.code,
-        cardType: cardType,
+        cardType,
         days: card.days,
         at: now
     });

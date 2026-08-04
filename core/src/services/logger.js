@@ -142,7 +142,6 @@ function getRootLogger() {
                 level: 'error',
                 maxsize: 10 * 1024 * 1024,
                 maxFiles: 5,
-                level: 'error',
                 format: combine(timestamp(), errors({ stack: true }), json()),
             }),
         ],

@@ -28,6 +28,7 @@ const { createRuntimeDoctor, safeStat, safeReadJson, createCheck } = require('..
 const diagnosticBundle = require('../services/diagnostic-bundle');
 const strategyTemplate = require('../services/strategy-template');
 const alertRuleEngine = require('../services/alert-rule-engine');
+const auditLog = require('../services/audit-log');
 
 const adminLogger = createModuleLogger('admin');
 
@@ -492,8 +493,8 @@ function startAdminServer(dataProvider) {
             return res.status(403).json({ ok: false, error: '无权限访问' });
         }
         
-        const limit = Math.min(Math.max(Number.parseInt(req.query.limit) || 100, 1), 500);
-        const offset = Math.max(Number.parseInt(req.query.offset) || 0, 0);
+        const limit = Math.min(Math.max(Number.Number.parseInt(req.query.limit) || 100, 1), 500);
+        const offset = Math.max(Number.Number.parseInt(req.query.offset) || 0, 0);
         
         const result = userStore.getLoginLogs(limit, offset);
         res.json({ ok: true, data: result });
@@ -1737,7 +1738,7 @@ function startAdminServer(dataProvider) {
             return res.status(403).json({ ok: false, error: '无权访问此账号' });
         }
         try {
-            const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 90);
+            const days = Math.min(Math.max(Number.parseInt(req.query.days, 10) || 30, 1), 90);
             const { getStatsTrend } = require('../services/stats');
             const points = getStatsTrend(id, days);
             res.json({ ok: true, data: { accountId: id, days, points } });
@@ -2466,7 +2467,7 @@ function startAdminServer(dataProvider) {
             const cardType = type === 'quota' ? 'quota' : 'time';
 
             // 批量创建
-            if (count && Number.parseInt(count, 10) > 1) {
+            if (count && Number.Number.parseInt(count, 10) > 1) {
                 const cards = userStore.createCardsBatch(description, days, count, cardType);
                 auditLog.record({
                     actor: req.currentUser.username, action: 'card.create.batch', target: `count:${cards.length}`,
@@ -2540,8 +2541,8 @@ function startAdminServer(dataProvider) {
     // 获取卡密消费流水（注册激活/续费使用/领取）
     app.get('/api/admin/card-logs', authRequired, adminRequired, (req, res) => {
         try {
-            const limit = Math.min(parseInt(req.query.limit, 10) || 200, 1000);
-            const offset = parseInt(req.query.offset, 10) || 0;
+            const limit = Math.min(Number.parseInt(req.query.limit, 10) || 200, 1000);
+            const offset = Number.parseInt(req.query.offset, 10) || 0;
             const action = typeof req.query.action === 'string' ? req.query.action : null;
             const result = userStore.getCardLogs(limit, offset, action);
             res.json({ ok: true, data: result });
@@ -2990,7 +2991,7 @@ function startAdminServer(dataProvider) {
     // API: 账号日志
     app.get('/api/account-logs', (req, res) => {
         try {
-            const limit = Number.parseInt(req.query.limit) || 100;
+            const limit = Number.Number.parseInt(req.query.limit) || 100;
             const currentUser = req.currentUser;
 
             let list = provider.getAccountLogs ? provider.getAccountLogs(limit) : [];
@@ -3034,7 +3035,7 @@ function startAdminServer(dataProvider) {
             const accessibleIds = getAccessibleAccountIds(req);
             const allLogs = [];
             const options = {
-                limit: Number.parseInt(req.query.limit) || 100,
+                limit: Number.Number.parseInt(req.query.limit) || 100,
                 tag: req.query.tag || '',
                 module: req.query.module || '',
                 event: req.query.event || '',
@@ -3061,7 +3062,7 @@ function startAdminServer(dataProvider) {
 
         // 指定了账号ID且通过权限检查，返回该账号的日志
         const options = {
-            limit: Number.parseInt(req.query.limit) || 100,
+            limit: Number.Number.parseInt(req.query.limit) || 100,
             tag: req.query.tag || '',
             module: req.query.module || '',
             event: req.query.event || '',
