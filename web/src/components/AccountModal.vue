@@ -280,189 +280,189 @@ watch(() => props.show, (newVal) => {
             {{ errorMessage }}
           </div>
 
-        <!-- Tabs -->
-        <div class="mb-4 flex border-b" :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 10%, transparent)' }">
-          <button
-            type="button"
-            class="min-w-0 flex-1 py-2 text-center text-sm font-medium transition-colors"
-            :class="activeTab === 'qq' ? 'border-b-2' : 'opacity-60'"
-            :style="{
-              color: activeTab === 'qq' ? 'var(--theme-primary)' : 'var(--theme-text)',
-              borderColor: 'var(--theme-primary)',
-            }"
-            @click="selectTab('qq')"
-          >
-            QQ扫码
-          </button>
-          <button
-            type="button"
-            class="min-w-0 flex-1 py-2 text-center text-sm font-medium transition-colors"
-            :class="activeTab === 'manual' ? 'border-b-2' : 'opacity-60'"
-            :style="{
-              color: activeTab === 'manual' ? 'var(--theme-primary)' : 'var(--theme-text)',
-              borderColor: 'var(--theme-primary)',
-            }"
-            @click="selectTab('manual')"
-          >
-            手动填码
-          </button>
-          <button
-            v-if="wxLoginStore.config.enabled"
-            type="button"
-            class="min-w-0 flex-1 py-2 text-center text-sm font-medium transition-colors"
-            :class="activeTab === 'wx' ? 'border-b-2' : 'opacity-60'"
-            :style="{
-              color: activeTab === 'wx' ? 'var(--theme-primary)' : 'var(--theme-text)',
-              borderColor: 'var(--theme-primary)',
-            }"
-            @click="selectTab('wx')"
-          >
-            微信扫码
-          </button>
-        </div>
-
-        <!-- QQ扫码 Tab -->
-        <div v-if="activeTab === 'qq'" class="space-y-4">
-          <BaseInput
-            v-model="form.name"
-            label="账号备注（可选）"
-            placeholder="留空使用 QQ 昵称"
-          />
-
-          <div class="flex flex-col items-center justify-center py-4 space-y-4">
-            <div
-              v-if="qqLoginStore.qrCode"
-              class="border rounded-lg bg-white p-2"
-              :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)' }"
+          <!-- Tabs -->
+          <div class="mb-4 flex border-b" :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 10%, transparent)' }">
+            <button
+              type="button"
+              class="min-w-0 flex-1 py-2 text-center text-sm font-medium transition-colors"
+              :class="activeTab === 'qq' ? 'border-b-2' : 'opacity-60'"
+              :style="{
+                color: activeTab === 'qq' ? 'var(--theme-primary)' : 'var(--theme-text)',
+                borderColor: 'var(--theme-primary)',
+              }"
+              @click="selectTab('qq')"
             >
-              <img :src="qqLoginStore.qrCode" alt="QQ 登录二维码" class="h-48 w-48">
-            </div>
-            <div
-              v-else
-              class="h-48 w-48 flex items-center justify-center rounded-lg"
-              :style="{ background: 'color-mix(in srgb, var(--theme-bg) 90%, var(--theme-text))' }"
+              QQ扫码
+            </button>
+            <button
+              type="button"
+              class="min-w-0 flex-1 py-2 text-center text-sm font-medium transition-colors"
+              :class="activeTab === 'manual' ? 'border-b-2' : 'opacity-60'"
+              :style="{
+                color: activeTab === 'manual' ? 'var(--theme-primary)' : 'var(--theme-text)',
+                borderColor: 'var(--theme-primary)',
+              }"
+              @click="selectTab('manual')"
             >
-              <div v-if="qqLoginStore.isLoading" i-svg-spinners-90-ring-with-bg class="text-3xl" :style="{ color: 'var(--theme-primary)' }" />
-              <span v-else class="px-4 text-center text-sm" :style="{ color: 'var(--theme-text)' }">二维码不可用</span>
+              手动填码
+            </button>
+            <button
+              v-if="wxLoginStore.config.enabled"
+              type="button"
+              class="min-w-0 flex-1 py-2 text-center text-sm font-medium transition-colors"
+              :class="activeTab === 'wx' ? 'border-b-2' : 'opacity-60'"
+              :style="{
+                color: activeTab === 'wx' ? 'var(--theme-primary)' : 'var(--theme-text)',
+                borderColor: 'var(--theme-primary)',
+              }"
+              @click="selectTab('wx')"
+            >
+              微信扫码
+            </button>
+          </div>
+
+          <!-- QQ扫码 Tab -->
+          <div v-if="activeTab === 'qq'" class="space-y-4">
+            <BaseInput
+              v-model="form.name"
+              label="账号备注（可选）"
+              placeholder="留空使用 QQ 昵称"
+            />
+
+            <div class="flex flex-col items-center justify-center py-4 space-y-4">
+              <div
+                v-if="qqLoginStore.qrCode"
+                class="border rounded-lg bg-white p-2"
+                :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)' }"
+              >
+                <img :src="qqLoginStore.qrCode" alt="QQ 登录二维码" class="h-48 w-48">
+              </div>
+              <div
+                v-else
+                class="h-48 w-48 flex items-center justify-center rounded-lg"
+                :style="{ background: 'color-mix(in srgb, var(--theme-bg) 90%, var(--theme-text))' }"
+              >
+                <div v-if="qqLoginStore.isLoading" i-svg-spinners-90-ring-with-bg class="text-3xl" :style="{ color: 'var(--theme-primary)' }" />
+                <span v-else class="px-4 text-center text-sm" :style="{ color: 'var(--theme-text)' }">二维码不可用</span>
+              </div>
+
+              <p class="min-h-5 text-center text-sm" :style="{ color: 'var(--theme-text)' }" aria-live="polite">
+                {{ qqLoginStore.statusMessage }}
+              </p>
+
+              <p v-if="qqLoginStore.errorMessage" class="text-center text-sm text-red-600" role="alert">
+                {{ qqLoginStore.errorMessage }}
+              </p>
+
+              <div class="flex flex-wrap justify-center gap-2">
+                <BaseButton variant="secondary" size="sm" :loading="qqLoginStore.isLoading" @click="loadQqQRCode">
+                  <span class="i-carbon-renew" />
+                  刷新二维码
+                </BaseButton>
+                <BaseButton v-if="isMobile && qqLoginStore.loginUrl" variant="secondary" size="sm" @click="openQqLoginUrl">
+                  <span class="i-carbon-launch" />
+                  打开 QQ
+                </BaseButton>
+              </div>
             </div>
 
-            <p class="min-h-5 text-center text-sm" :style="{ color: 'var(--theme-text)' }" aria-live="polite">
-              {{ qqLoginStore.statusMessage }}
-            </p>
+            <div class="text-center text-xs opacity-60" :style="{ color: 'var(--theme-text)' }">
+              使用手机 QQ 扫码，确认后自动添加账号
+            </div>
+          </div>
 
-            <p v-if="qqLoginStore.errorMessage" class="text-center text-sm text-red-600" role="alert">
-              {{ qqLoginStore.errorMessage }}
-            </p>
+          <!-- 微信扫码 Tab -->
+          <div v-if="activeTab === 'wx'" class="space-y-4">
+            <BaseInput
+              v-model="wxAccountName"
+              label="账号备注（可选）"
+              placeholder="留空使用微信昵称"
+            />
 
-            <div class="flex flex-wrap justify-center gap-2">
-              <BaseButton variant="secondary" size="sm" :loading="qqLoginStore.isLoading" @click="loadQqQRCode">
-                <span class="i-carbon-renew" />
+            <div class="flex flex-col items-center justify-center py-4 space-y-4">
+              <div
+                v-if="wxQrImageSrc"
+                class="border rounded-lg p-2"
+                :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)', background: 'var(--color-bg-surface)' }"
+              >
+                <img :src="wxQrImageSrc" class="h-48 w-48">
+              </div>
+              <div
+                v-else
+                class="h-48 w-48 flex items-center justify-center rounded-lg"
+                :style="{ background: 'color-mix(in srgb, var(--theme-bg) 90%, var(--theme-text))' }"
+              >
+                <div v-if="wxLoginStore.isLoading" i-svg-spinners-90-ring-with-bg class="text-3xl" :style="{ color: 'var(--theme-primary)' }" />
+                <span v-else class="text-sm" :style="{ color: 'var(--theme-text)' }">点击获取二维码</span>
+              </div>
+
+              <p class="text-center text-sm" :style="{ color: 'var(--theme-text)' }">
+                {{ wxLoginStore.statusMessage }}
+              </p>
+
+              <p v-if="wxLoginStore.errorMessage" class="text-center text-sm text-red-600">
+                {{ wxLoginStore.errorMessage }}
+              </p>
+
+              <BaseButton variant="secondary" size="sm" :loading="wxLoginStore.isLoading" @click="loadWxQRCode">
                 刷新二维码
               </BaseButton>
-              <BaseButton v-if="isMobile && qqLoginStore.loginUrl" variant="secondary" size="sm" @click="openQqLoginUrl">
-                <span class="i-carbon-launch" />
-                打开 QQ
+            </div>
+
+            <div class="text-center text-xs opacity-60" :style="{ color: 'var(--theme-text)' }">
+              使用微信扫描二维码登录，登录成功后将自动添加账号
+            </div>
+          </div>
+
+          <!-- 手动填码 Tab -->
+          <div v-if="activeTab === 'manual'" class="space-y-4">
+            <BaseInput
+              v-model="form.name"
+              label="账号备注（可选）"
+              placeholder="留空默认账号"
+            />
+
+            <BaseTextarea
+              v-model="form.code"
+              label="Code"
+              placeholder="请输入登录 Code"
+              :rows="3"
+            />
+
+            <div v-if="!editData" class="flex gap-4">
+              <label class="flex cursor-pointer items-center gap-2">
+                <input
+                  v-model="form.platform"
+                  type="radio"
+                  value="qq"
+                  class="h-4 w-4"
+                  :style="{ accentColor: 'var(--theme-primary)' }"
+                >
+                <span class="text-sm" :style="{ color: 'var(--theme-text)' }">QQ小程序</span>
+              </label>
+              <label class="flex cursor-pointer items-center gap-2">
+                <input
+                  v-model="form.platform"
+                  type="radio"
+                  value="wx"
+                  class="h-4 w-4"
+                  :style="{ accentColor: 'var(--theme-primary)' }"
+                >
+                <span class="text-sm" :style="{ color: 'var(--theme-text)' }">微信小程序</span>
+              </label>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4">
+              <BaseButton variant="outline" @click="close">
+                取消
+              </BaseButton>
+              <BaseButton variant="primary" :loading="loading" @click="submitManual">
+                {{ editData ? '保存' : '添加' }}
               </BaseButton>
             </div>
-          </div>
-
-          <div class="text-center text-xs opacity-60" :style="{ color: 'var(--theme-text)' }">
-            使用手机 QQ 扫码，确认后自动添加账号
-          </div>
-        </div>
-
-        <!-- 微信扫码 Tab -->
-        <div v-if="activeTab === 'wx'" class="space-y-4">
-          <BaseInput
-            v-model="wxAccountName"
-            label="账号备注（可选）"
-            placeholder="留空使用微信昵称"
-          />
-
-          <div class="flex flex-col items-center justify-center py-4 space-y-4">
-            <div
-              v-if="wxQrImageSrc"
-              class="border rounded-lg p-2"
-              :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)', background: 'var(--color-bg-surface)' }"
-            >
-              <img :src="wxQrImageSrc" class="h-48 w-48">
-            </div>
-            <div
-              v-else
-              class="h-48 w-48 flex items-center justify-center rounded-lg"
-              :style="{ background: 'color-mix(in srgb, var(--theme-bg) 90%, var(--theme-text))' }"
-            >
-              <div v-if="wxLoginStore.isLoading" i-svg-spinners-90-ring-with-bg class="text-3xl" :style="{ color: 'var(--theme-primary)' }" />
-              <span v-else class="text-sm" :style="{ color: 'var(--theme-text)' }">点击获取二维码</span>
-            </div>
-
-            <p class="text-center text-sm" :style="{ color: 'var(--theme-text)' }">
-              {{ wxLoginStore.statusMessage }}
-            </p>
-
-            <p v-if="wxLoginStore.errorMessage" class="text-center text-sm text-red-600">
-              {{ wxLoginStore.errorMessage }}
-            </p>
-
-            <BaseButton variant="secondary" size="sm" :loading="wxLoginStore.isLoading" @click="loadWxQRCode">
-              刷新二维码
-            </BaseButton>
-          </div>
-
-          <div class="text-center text-xs opacity-60" :style="{ color: 'var(--theme-text)' }">
-            使用微信扫描二维码登录，登录成功后将自动添加账号
-          </div>
-        </div>
-
-        <!-- 手动填码 Tab -->
-        <div v-if="activeTab === 'manual'" class="space-y-4">
-          <BaseInput
-            v-model="form.name"
-            label="账号备注（可选）"
-            placeholder="留空默认账号"
-          />
-
-          <BaseTextarea
-            v-model="form.code"
-            label="Code"
-            placeholder="请输入登录 Code"
-            :rows="3"
-          />
-
-          <div v-if="!editData" class="flex gap-4">
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="form.platform"
-                type="radio"
-                value="qq"
-                class="h-4 w-4"
-                :style="{ accentColor: 'var(--theme-primary)' }"
-              >
-              <span class="text-sm" :style="{ color: 'var(--theme-text)' }">QQ小程序</span>
-            </label>
-            <label class="flex cursor-pointer items-center gap-2">
-              <input
-                v-model="form.platform"
-                type="radio"
-                value="wx"
-                class="h-4 w-4"
-                :style="{ accentColor: 'var(--theme-primary)' }"
-              >
-              <span class="text-sm" :style="{ color: 'var(--theme-text)' }">微信小程序</span>
-            </label>
-          </div>
-
-          <div class="flex justify-end gap-2 pt-4">
-            <BaseButton variant="outline" @click="close">
-              取消
-            </BaseButton>
-            <BaseButton variant="primary" :loading="loading" @click="submitManual">
-              {{ editData ? '保存' : '添加' }}
-            </BaseButton>
           </div>
         </div>
       </div>
     </div>
-  </div>
   </Transition>
 </template>
