@@ -139,7 +139,7 @@ watch(() => props.show, (newVal) => {
           <div
             v-if="qrImageSrc"
             class="border rounded-lg p-2"
-            :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)', background: '#fff' }"
+            :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)', background: 'var(--color-bg-surface)' }"
           >
             <img :src="qrImageSrc" class="h-48 w-48">
           </div>

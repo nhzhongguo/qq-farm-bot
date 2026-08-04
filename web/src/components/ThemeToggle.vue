@@ -55,7 +55,7 @@ function selectTheme(theme: Theme) {
             :style="{
               'background': t.gradient,
               '--tw-ring-color': t.primary,
-              '--tw-ring-offset-color': t.isDark ? '#1f2937' : '#ffffff',
+              '--tw-ring-offset-color': t.isDark ? 'var(--color-bg-elevated)' : 'var(--color-bg-surface)',
             }"
             :title="t.name"
             @click="selectTheme(theme as Theme)"

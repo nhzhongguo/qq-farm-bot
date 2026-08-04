@@ -530,7 +530,7 @@ useIntervalFn(loadBag, 60000)
   content: attr(data-fallback);
   font-size: 1.5rem;
   font-weight: bold;
-  color: #9ca3af;
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
 }
 </style>
