@@ -112,9 +112,9 @@ function formatAxis(value: number) {
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
           <div class="i-carbon-data-set text-lg text-[var(--theme-primary)]" />
-          <span class="font-medium text-gray-800 dark:text-gray-200">{{ currentAccount?.name }}</span>
+          <span class="text-gray-800 font-medium dark:text-gray-200">{{ currentAccount?.name }}</span>
         </div>
-        <div class="flex overflow-hidden rounded-lg border border-gray-200 dark:border-gray-600">
+        <div class="flex overflow-hidden border border-gray-200 rounded-lg dark:border-gray-600">
           <button
             v-for="option in rangeOptions"
             :key="option.value"
@@ -135,43 +135,45 @@ function formatAxis(value: number) {
       </div>
 
       <div v-else-if="!hasData" class="rounded-lg bg-white p-8 text-center text-gray-500 shadow dark:bg-gray-800">
-        <div class="mb-2 text-3xl"><div class="inline-block i-carbon-chart-line" /></div>
+        <div class="mb-2 text-3xl">
+          <div class="i-carbon-chart-line inline-block" />
+        </div>
         暂无统计历史。机器人运行并保存统计后，这里将展示金币、经验与操作数趋势。
       </div>
 
       <div v-else class="space-y-4">
         <!-- 汇总卡片 -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div class="rounded-lg border border-amber-200 bg-white p-4 dark:border-amber-900 dark:bg-gray-800">
+          <div class="border border-amber-200 rounded-lg bg-white p-4 dark:border-amber-900 dark:bg-gray-800">
             <div class="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
               <div class="i-carbon-currency" />
               当前金币
             </div>
-            <div class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+            <div class="mt-1 text-2xl text-gray-900 font-bold dark:text-white">
               {{ formatAxis(points[points.length - 1]?.gold || 0) }}
             </div>
             <div class="mt-1 text-xs text-gray-400">
               周期内累计 +{{ formatAxis(points.reduce((s, p) => s + (p.goldGained || 0), 0)) }}
             </div>
           </div>
-          <div class="rounded-lg border border-purple-200 bg-white p-4 dark:border-purple-900 dark:bg-gray-800">
+          <div class="border border-purple-200 rounded-lg bg-white p-4 dark:border-purple-900 dark:bg-gray-800">
             <div class="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400">
               <div class="i-carbon-growth" />
               当前经验
             </div>
-            <div class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+            <div class="mt-1 text-2xl text-gray-900 font-bold dark:text-white">
               {{ formatAxis(points[points.length - 1]?.exp || 0) }}
             </div>
             <div class="mt-1 text-xs text-gray-400">
               周期内累计 +{{ formatAxis(points.reduce((s, p) => s + (p.expGained || 0), 0)) }}
             </div>
           </div>
-          <div class="rounded-lg border border-green-200 bg-white p-4 dark:border-green-900 dark:bg-gray-800">
+          <div class="border border-green-200 rounded-lg bg-white p-4 dark:border-green-900 dark:bg-gray-800">
             <div class="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
               <div class="i-carbon-catalog" />
               周期操作数
             </div>
-            <div class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+            <div class="mt-1 text-2xl text-gray-900 font-bold dark:text-white">
               {{ formatAxis(totalOperations.reduce((s, n) => s + n, 0)) }}
             </div>
             <div class="mt-1 text-xs text-gray-400">
@@ -181,16 +183,16 @@ function formatAxis(value: number) {
         </div>
 
         <!-- 金币趋势 -->
-        <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            <h3 class="text-sm text-gray-800 font-semibold dark:text-gray-200">
               <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-amber-500 align-middle" />
               金币趋势
             </h3>
             <span class="text-xs text-gray-400">累计余额与每日增量</span>
           </div>
           <div class="flex flex-wrap items-start gap-1">
-            <svg viewBox="0 0 560 160" class="chart-svg w-full max-w-full min-w-0 flex-1" preserveAspectRatio="none">
+            <svg viewBox="0 0 560 160" class="chart-svg max-w-full min-w-0 w-full flex-1" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="goldArea" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stop-color="var(--color-chart-gold)" stop-opacity="0.25" />
@@ -217,9 +219,9 @@ function formatAxis(value: number) {
         </div>
 
         <!-- 经验趋势 -->
-        <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            <h3 class="text-sm text-gray-800 font-semibold dark:text-gray-200">
               <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-purple-500 align-middle" />
               经验趋势
             </h3>
@@ -251,9 +253,9 @@ function formatAxis(value: number) {
         </div>
 
         <!-- 每日操作数 -->
-        <div class="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            <h3 class="text-sm text-gray-800 font-semibold dark:text-gray-200">
               <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-green-500 align-middle" />
               每日操作数
             </h3>

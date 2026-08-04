@@ -1064,6 +1064,7 @@ interface AlertRule {
   threshold: number
   channel: string
   endpoint: string
+  token?: string
   enabled: boolean
   createdAt: number
   updatedAt: number
@@ -1147,7 +1148,25 @@ const alertTest = ref({
   channel: 'log',
   endpoint: '',
   token: '',
+  selectedRuleId: '',
 })
+
+/** 从规则自动填充测试配置 */
+function applyAlertRule(ruleId?: string | number) {
+  const rid = ruleId == null ? '' : String(ruleId)
+  if (!rid) {
+    alertTest.value.channel = 'log'
+    alertTest.value.endpoint = ''
+    alertTest.value.token = ''
+    return
+  }
+  const rule = alertRules.value.find(r => r.id === rid || r.name === rid)
+  if (rule) {
+    alertTest.value.channel = rule.channel || 'log'
+    alertTest.value.endpoint = rule.endpoint || ''
+    alertTest.value.token = rule.token || ''
+  }
+}
 const alertTestLoading = ref(false)
 const alertTestResult = ref('')
 
@@ -1320,7 +1339,8 @@ function clearAnnouncement() {
 
 /** Simple Markdown to HTML */
 function renderMarkdown(text: string) {
-  if (!text) return ''
+  if (!text)
+    return ''
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -2300,6 +2320,16 @@ function renderMarkdown(text: string) {
             <h4 class="mb-3 text-sm font-medium">
               测试推送
             </h4>
+            <div class="mb-3">
+              <BaseSelect v-model="alertTest.selectedRuleId" label="使用已有规则" @update:model-value="applyAlertRule">
+                <option value="">
+                  手动配置
+                </option>
+                <option v-for="rule in alertRules.filter(r => r.enabled !== false)" :key="rule.id || rule.name" :value="rule.id || rule.name">
+                  {{ rule.name }}
+                </option>
+              </BaseSelect>
+            </div>
             <div class="grid gap-3 sm:grid-cols-3">
               <BaseSelect v-model="alertTest.channel" label="渠道">
                 <option value="log">

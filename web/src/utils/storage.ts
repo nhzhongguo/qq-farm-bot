@@ -1,4 +1,5 @@
-import { useStorage, type RemovableRef } from '@vueuse/core'
+import type { RemovableRef } from '@vueuse/core'
+import { useStorage } from '@vueuse/core'
 
 /**
  * useStorage 的默认序列化器按默认值类型推断：

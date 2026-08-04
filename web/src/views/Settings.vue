@@ -572,6 +572,63 @@ const templateLoading = ref(false)
 const newTemplateName = ref('')
 const newTemplateDesc = ref('')
 
+/** 导出选中账号 */
+function exportAccounts() {
+  const ids = selectedAccountIds.value
+  if (ids.size === 0) {
+    toastStore.error('请先选择要导出的账号')
+    return
+  }
+  const selected = accounts.value.filter(a => a.id && ids.has(String(a.id)))
+  const data = selected.map((a: any) => ({
+    id: a.id,
+    name: a.name || '',
+    remark: a.remark || '',
+    platform: a.platform || '',
+    gid: a.gid || '',
+  }))
+  const blob = new Blob([JSON.stringify({ schemaVersion: 1, exportedAt: Date.now(), accounts: data }, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `farm-accounts-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  toastStore.success(`已导出 ${data.length} 个账号`)
+}
+
+/** 导入账号 */
+function importAccounts() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = async (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file)
+      return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      const list = data.accounts || []
+      if (!Array.isArray(list) || list.length === 0) {
+        toastStore.error('导入文件格式不正确')
+        return
+      }
+      for (const acc of list) {
+        if (acc.id) {
+          await accountStore.addAccount(acc)
+        }
+      }
+      toastStore.success(`已导入 ${list.length} 个账号`)
+      await accountStore.fetchAccounts()
+    }
+    catch (err) {
+      toastStore.error(`导入失败: ${(err as any).message || err}`)
+    }
+  }
+  input.click()
+}
+
 async function exportConfig() {
   if (!currentAccountId.value)
     return
@@ -603,7 +660,7 @@ function importConfig() {
   input.type = 'file'
   input.accept = '.json'
   input.onchange = async (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0]
+    const file = (e as any).target?.files?.[0]
     if (!file)
       return
     try {
@@ -1210,6 +1267,23 @@ async function handleTestOffline() {
               >
                 <div class="i-carbon-renew mr-1" />
                 批量重启
+              </BaseButton>
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                :disabled="accounts.length === 0"
+                @click="exportAccounts"
+              >
+                <div class="i-carbon-download mr-1" />
+                导出选中
+              </BaseButton>
+              <BaseButton
+                variant="secondary"
+                size="sm"
+                @click="importAccounts"
+              >
+                <div class="i-carbon-upload mr-1" />
+                导入账号
               </BaseButton>
               <BaseButton
                 v-if="selectedCount > 0"
