@@ -462,6 +462,8 @@ function startAdminServer(dataProvider) {
                     role: user.role, 
                     card: user.card, 
                     accountLimit: user.accountLimit || userStore.DEFAULT_ACCOUNT_LIMIT || 2,
+                    pushLimit: user.pushLimit || 50,
+                    operationRateLimit: user.operationRateLimit || 30,
                     user: { username: user.username },
                     mustChangePassword: user.mustChangePassword || false,
                     sessionExpiresAt: createdAt + sessionAbsoluteTtlMs,
@@ -2609,12 +2611,14 @@ function startAdminServer(dataProvider) {
     app.post('/api/admin/users/:username/edit', authRequired, adminRequired, (req, res) => {
         try {
             const { username } = req.params;
-            const { newUsername, password, accountLimit, expiresAt, isPermanent } = req.body || {};
+            const { newUsername, password, accountLimit, pushLimit, operationRateLimit, expiresAt, isPermanent } = req.body || {};
             
             const result = userStore.editUser(username, {
                 newUsername,
                 password,
                 accountLimit,
+                pushLimit,
+                operationRateLimit,
                 expiresAt,
                 isPermanent
             });

@@ -466,6 +466,8 @@ function validateUser(username, password, ip = 'unknown') {
         cardCode: user.cardCode || null,
         card: user.card || null,
         accountLimit: user.accountLimit || DEFAULT_ACCOUNT_LIMIT,
+        pushLimit: user.pushLimit || 50,
+        operationRateLimit: user.operationRateLimit || 30,
         mustChangePassword: user.mustChangePassword === true
     };
 }
@@ -698,7 +700,7 @@ function updateUser(username, updates) {
 
     saveUsers();
 
-    return { username: user.username, role: user.role, card: user.card, accountLimit: user.accountLimit || DEFAULT_ACCOUNT_LIMIT };
+    return { username: user.username, role: user.role, card: user.card, accountLimit: user.accountLimit || DEFAULT_ACCOUNT_LIMIT, pushLimit: user.pushLimit || 50, operationRateLimit: user.operationRateLimit || 30 };
 }
 
 function editUser(oldUsername, updates) {
@@ -730,6 +732,14 @@ function editUser(oldUsername, updates) {
 
     if (updates.accountLimit !== undefined) {
         user.accountLimit = Number.parseInt(updates.accountLimit, 10) || DEFAULT_ACCOUNT_LIMIT;
+    }
+
+    if (updates.pushLimit !== undefined) {
+        user.pushLimit = Math.max(0, Number.parseInt(updates.pushLimit, 10) || 50);
+    }
+
+    if (updates.operationRateLimit !== undefined) {
+        user.operationRateLimit = Math.max(0, Number.parseInt(updates.operationRateLimit, 10) || 30);
     }
 
     if (updates.isPermanent) {

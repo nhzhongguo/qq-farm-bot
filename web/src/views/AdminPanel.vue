@@ -458,12 +458,16 @@ interface UserInfo {
   role: string
   card: UserCard | null
   accountLimit: number
+  pushLimit: number
+  operationRateLimit: number
 }
 
 interface EditForm {
   newUsername: string
   password: string
   accountLimit: number
+  pushLimit: number
+  operationRateLimit: number
   expiresAt: string
   isPermanent: boolean
 }
@@ -476,6 +480,8 @@ const editForm = ref<EditForm>({
   newUsername: '',
   password: '',
   accountLimit: 2,
+  pushLimit: 50,
+  operationRateLimit: 30,
   expiresAt: '',
   isPermanent: false,
 })
@@ -544,6 +550,8 @@ function openEditModal(user: UserInfo) {
     newUsername: user.username,
     password: '',
     accountLimit: user.accountLimit || 2,
+    pushLimit: user.pushLimit || 50,
+    operationRateLimit: user.operationRateLimit || 30,
     expiresAt: user.card?.expiresAt ? formatDateTimeLocal(user.card.expiresAt) : '',
     isPermanent: user.card?.days === -1,
   }
@@ -572,6 +580,8 @@ async function handleEdit() {
 
     const updateData: Record<string, any> = {
       accountLimit: editForm.value.accountLimit,
+      pushLimit: editForm.value.pushLimit,
+      operationRateLimit: editForm.value.operationRateLimit,
       expiresAt: expiresAtValue,
       isPermanent: editForm.value.isPermanent,
     }
@@ -1814,6 +1824,9 @@ function clearAnnouncement() {
                         :class="user.role === 'admin' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'"
                       >
                         {{ user.role === 'admin' ? '无限制' : `${user.accountLimit || 2}个` }}
+                      </span>
+                      <span v-if="user.role !== 'admin'" class="ml-1 text-[10px] text-gray-400">
+                        (推送{{ user.pushLimit || 50 }}/操作{{ user.operationRateLimit || 30 }})
                       </span>
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-sm text-gray-900 dark:text-white">
