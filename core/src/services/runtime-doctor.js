@@ -291,4 +291,6 @@ module.exports = {
     checkConfigIntegrity,
     checkStoreIntegrity,
     checkScheduler,
+    safeStat,
+    safeReadJson,
 };

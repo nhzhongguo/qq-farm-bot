@@ -24,8 +24,7 @@ const { WxLoginClient, WxLoginClientError } = require('../services/wx-login-clie
 const { WxLoginSessionError, wxLoginSessionManager } = require('../services/wx-login-session');
 const userStore = require('../models/user-store');
 const { rateLimitMiddleware, resetRateLimitStore } = require('../services/security');
-const { createRuntimeDoctor } = require('../services/runtime-doctor');
-const auditLog = require('../services/audit-log');
+const { createRuntimeDoctor, safeStat, safeReadJson, createCheck } = require('../services/runtime-doctor');
 const diagnosticBundle = require('../services/diagnostic-bundle');
 const strategyTemplate = require('../services/strategy-template');
 const alertRuleEngine = require('../services/alert-rule-engine');
@@ -1996,6 +1995,53 @@ function startAdminServer(dataProvider) {
 
     app.get('/api/admin/doctor', authRequired, adminRequired, (req, res) => {
         const storeFilePath = path.join(getDataDir(), 'store.json');
+    const storageChecks = [];
+    const dataDir = getDataDir();
+    const storageFiles = [
+        { file: 'users.json', hasBak: true },
+        { file: 'cards.json', hasBak: true },
+        { file: 'accounts.json', hasBak: true },
+        { file: 'store.json', hasBak: false },
+        { file: 'login-logs.json', hasBak: false },
+        { file: 'card-logs.json', hasBak: false },
+        { file: 'card-claim.json', hasBak: false },
+    ];
+    for (const { file, hasBak } of storageFiles) {
+        const filePath = path.join(dataDir, file);
+        const stat = safeStat(filePath);
+        const label = file.replace('.json', '');
+        if (!stat) {
+            storageChecks.push(createCheck(`storage-${label}`, `数据文件 ${file}`, 'error', '文件不存在'));
+        } else if (stat.size === 0) {
+            storageChecks.push(createCheck(`storage-${label}`, `数据文件 ${file}`, 'error', '文件为空'));
+        } else {
+            const data = safeReadJson(filePath);
+            if (data === null) {
+                storageChecks.push(createCheck(`storage-${label}`, `数据文件 ${file}`, 'error', 'JSON 解析失败'));
+            } else if (data === undefined) {
+                storageChecks.push(createCheck(`storage-${label}`, `数据文件 ${file}`, 'error', 'JSON 解析失败'));
+            } else {
+                storageChecks.push(createCheck(`storage-${label}`, `数据文件 ${file}`, 'ok', '可读', { size: stat.size }));
+            }
+        }
+        if (hasBak) {
+            const bakPath = path.join(dataDir, `${file}.bak`);
+            const bakStat = safeStat(bakPath);
+            const bakLabel = `${label}.bak`;
+            if (!bakStat) {
+                storageChecks.push(createCheck(`storage-${bakLabel}`, `备份文件 ${file}.bak`, 'warn', '备份文件不存在'));
+            } else if (bakStat.size === 0) {
+                storageChecks.push(createCheck(`storage-${bakLabel}`, `备份文件 ${file}.bak`, 'warn', '备份文件为空'));
+            } else {
+                const bakData = safeReadJson(bakPath);
+                if (bakData === null || bakData === undefined) {
+                    storageChecks.push(createCheck(`storage-${bakLabel}`, `备份文件 ${file}.bak`, 'warn', '备份 JSON 解析失败'));
+                } else {
+                    storageChecks.push(createCheck(`storage-${bakLabel}`, `备份文件 ${file}.bak`, 'ok', '可读', { size: bakStat.size }));
+                }
+            }
+        }
+    }
         const doctor = createRuntimeDoctor({
             dataDir: getDataDir(),
             versionManifestPath: path.resolve(__dirname, '../../..', 'version.json'),
