@@ -133,10 +133,15 @@ function getRootLogger() {
             }),
             new winston.transports.File({
                 filename: path.join(logDir, 'combined.log'),
+                maxsize: 10 * 1024 * 1024,
+                maxFiles: 5,
                 format: combine(timestamp(), errors({ stack: true }), json()),
             }),
             new winston.transports.File({
                 filename: path.join(logDir, 'error.log'),
+                level: 'error',
+                maxsize: 10 * 1024 * 1024,
+                maxFiles: 5,
                 level: 'error',
                 format: combine(timestamp(), errors({ stack: true }), json()),
             }),
