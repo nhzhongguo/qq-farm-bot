@@ -27,6 +27,7 @@ Thumbs.db
 # AI agent worktrees and temp dirs
 .codex/
 .agent/
+.reasonix/
 
 # Playwright
 web/test-results/
