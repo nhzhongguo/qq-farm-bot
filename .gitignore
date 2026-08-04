@@ -33,3 +33,9 @@ web/test-results/
 web/playwright-report/
 web/blob-report/
 
+
+# One-off analysis scripts
+scripts/bench-*.py
+scripts/bench-*.ps1
+scripts/cleanup-execute.ps1
+
