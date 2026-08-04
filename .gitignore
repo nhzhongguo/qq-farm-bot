@@ -39,3 +39,8 @@ scripts/bench-*.py
 scripts/bench-*.ps1
 scripts/cleanup-execute.ps1
 
+
+# Upgrade report byproducts
+upgrade-report/_raw/
+upgrade-report/*.inspect.ndjson
+
