@@ -20,6 +20,13 @@ export default defineConfig({
       algorithm: 'gzip',
       ext: '.gz',
     }),
+    viteCompression({
+      verbose: false,
+      disable: false,
+      threshold: 10240,
+      algorithm: 'brotliCompress',
+      ext: '.br',
+    }),
     visualizer({
       open: false,
       gzipSize: true,
