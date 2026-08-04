@@ -29,6 +29,7 @@ const diagnosticBundle = require('../services/diagnostic-bundle');
 const strategyTemplate = require('../services/strategy-template');
 const alertRuleEngine = require('../services/alert-rule-engine');
 const auditLog = require('../services/audit-log');
+const reportService = require('../services/report');
 
 const adminLogger = createModuleLogger('admin');
 
@@ -1744,6 +1745,62 @@ function startAdminServer(dataProvider) {
             res.json({ ok: true, data: { accountId: id, days, points } });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // ============ 运营报表（日报 / 周报 / 多账号对比） ============
+    // 数据口径与 stats.js 日归档、task-run-store 一致；HTML 输出已脱敏转义。
+    const REPORT_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    const resolveReportRequest = (req) => {
+        const type = String(req.query.type || 'daily').trim();
+        const accessible = getAccessibleAccountIds(req);
+        if (accessible.length === 0) return { error: '无账号可访问' };
+        if (type === 'compare') {
+            const requested = String(req.query.accountIds || '').split(',').map(s => s.trim()).filter(Boolean);
+            const allowed = new Set(accessible);
+            const ids = (requested.length ? requested : accessible).filter(id => allowed.has(id));
+            if (ids.length === 0) return { error: '没有可访问的账号' };
+            return { options: { type: 'compare', accountIds: ids, days: Number.parseInt(req.query.days, 10) || undefined } };
+        }
+        const id = getAccId(req);
+        if (!id) return { error: 'Missing x-account-id' };
+        if (!checkAccountAccess(req, id)) return { error: '无权访问此账号' };
+        return {
+            options: {
+                type,
+                accountId: id,
+                date: REPORT_DATE_RE.test(String(req.query.date || '')) ? req.query.date : undefined,
+                startDate: REPORT_DATE_RE.test(String(req.query.startDate || '')) ? req.query.startDate : undefined,
+                endDate: REPORT_DATE_RE.test(String(req.query.endDate || '')) ? req.query.endDate : undefined,
+            },
+        };
+    };
+    const respondReportError = (res, message) => {
+        const status = message === '无权访问此账号' ? 403 : 400;
+        return res.status(status).json({ ok: false, error: message });
+    };
+
+    // API: 报表 JSON（机器可读）
+    app.get('/api/report', (req, res) => {
+        const resolved = resolveReportRequest(req);
+        if (resolved.error) return respondReportError(res, resolved.error);
+        try {
+            const data = reportService.generateReport(resolved.options);
+            res.json({ ok: true, data });
+        } catch (e) {
+            respondReportError(res, e.message);
+        }
+    });
+
+    // API: 报表 HTML（浏览器打印 / 下载 / 邮件正文）
+    app.get('/api/report/html', (req, res) => {
+        const resolved = resolveReportRequest(req);
+        if (resolved.error) return respondReportError(res, resolved.error);
+        try {
+            const data = reportService.generateReport(resolved.options);
+            res.type('html').send(reportService.renderHtml(data));
+        } catch (e) {
+            respondReportError(res, e.message);
         }
     });
 
