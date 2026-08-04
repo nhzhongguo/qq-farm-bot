@@ -98,8 +98,7 @@ function validateForm(): boolean {
     error.value = usernameValid.value.message
     return false
   }
-  // 测试阶段关闭密码登录时，登录页允许空密码。
-  if (!isLogin.value && !password.value) {
+  if (!password.value) {
     error.value = '请输入密码'
     return false
   }
@@ -358,18 +357,11 @@ onMounted(() => {
           <div class="space-y-4">
             <BaseInput v-model="username" label="用户名" placeholder="请输入用户名" />
             <BaseInput
-              v-if="!isLogin"
               v-model="password"
               type="password"
               label="密码"
               placeholder="请输入密码"
             />
-            <div
-              v-else
-              class="border border-amber-300 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
-            >
-              测试阶段已关闭密码登录，输入用户名即可进入。
-            </div>
 
             <div v-if="!isLogin && showPasswordStrength" class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
               <div class="mb-2 flex items-center justify-between text-xs">

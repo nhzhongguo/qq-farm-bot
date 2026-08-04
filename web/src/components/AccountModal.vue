@@ -261,23 +261,24 @@ watch(() => props.show, (newVal) => {
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div class="max-h-[90vh] max-w-md w-full overflow-hidden rounded-lg shadow-xl" :style="{ background: 'var(--theme-bg)' }">
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b p-4" :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 10%, transparent)' }">
-        <h3 class="text-lg font-semibold" :style="{ color: 'var(--theme-text)' }">
-          {{ editData ? '编辑账号' : '添加账号' }}
-        </h3>
-        <BaseButton variant="ghost" class="!p-1" @click="close">
-          <div class="i-carbon-close text-xl" :style="{ color: 'var(--theme-text)' }" />
-        </BaseButton>
-      </div>
-
-      <div class="max-h-[calc(90vh-80px)] overflow-y-auto p-4">
-        <!-- 错误信息 -->
-        <div v-if="errorMessage" class="mb-4 rounded p-3 text-sm" :style="{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }">
-          {{ errorMessage }}
+  <Transition name="fade">
+    <div v-if="show" role="dialog" aria-modal="true" :aria-label="editData ? '编辑账号' : '添加账号'" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @keydown.esc="close">
+      <div class="max-h-[90vh] max-w-md w-full overflow-hidden rounded-lg shadow-xl" :style="{ background: 'var(--theme-bg)' }">
+        <!-- Header -->
+        <div class="flex items-center justify-between border-b p-4" :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 10%, transparent)' }">
+          <h3 class="text-lg font-semibold" :style="{ color: 'var(--theme-text)' }">
+            {{ editData ? '编辑账号' : '添加账号' }}
+          </h3>
+          <BaseButton variant="ghost" class="!p-1" aria-label="关闭" @click="close">
+            <div class="i-carbon-close text-xl" :style="{ color: 'var(--theme-text)' }" />
+          </BaseButton>
         </div>
+
+        <div class="max-h-[calc(90vh-80px)] overflow-y-auto p-4">
+          <!-- 错误信息 -->
+          <div v-if="errorMessage" class="mb-4 rounded p-3 text-sm" :style="{ background: 'color-mix(in srgb, var(--color-danger) 10%, transparent)', color: 'var(--color-danger)' }">
+            {{ errorMessage }}
+          </div>
 
         <!-- Tabs -->
         <div class="mb-4 flex border-b" :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 10%, transparent)' }">
@@ -463,4 +464,5 @@ watch(() => props.show, (newVal) => {
       </div>
     </div>
   </div>
+  </Transition>
 </template>

@@ -191,6 +191,7 @@ class MiniProgramLoginSession {
             if (+resCode === 0) {
                 if (+data.ok !== 1) return { status: 'Wait' };
                 // 这里的 data.nick 字段可能存在，需要确认返回结构
+                console.log('[qrlogin] queryStatus OK:', JSON.stringify({ ticket: Boolean(data.ticket), uin: Boolean(data.uin), nick: data.nick || '' }).slice(0, 300));
                 return { status: 'OK', ticket: data.ticket, uin: data.uin, nickname: data.nick || '' };
             }
 
@@ -214,8 +215,25 @@ class MiniProgramLoginSession {
 
             if (response.status !== 200) return '';
 
-            const { code } = response.data;
-            return code || '';
+            const data = response.data || {};
+            // 兼容两种返回结构（与 GetLoginCode 同构的嵌套结构，或直接的 { code: '...' }）：
+            //   { code: 0, data: { code: '<authCode>' } }
+            //   { code: '<authCode>', message: '' }
+            const nested = data && typeof data.data === 'object' && data.data !== null ? data.data : {};
+            const rawCode = String(
+                nested.code !== undefined ? nested.code
+                    : nested.authCode !== undefined ? nested.authCode
+                        : data.code !== undefined ? data.code
+                            : ''
+            ).trim();
+
+            // 过滤错误码（如 "-13200"）等无效值，只接受形如登录 Code 的长字符串
+            const looksValid = rawCode.length >= 16 && rawCode.length <= 4096 && !/\s/.test(rawCode);
+            if (!looksValid) {
+                console.error('[qrlogin] 换取农场 Code 无效响应:', JSON.stringify(data).slice(0, 300));
+                return '';
+            }
+            return rawCode;
         } catch (error) {
             console.error('MP Get Auth Code Error:', error.message);
             return '';
