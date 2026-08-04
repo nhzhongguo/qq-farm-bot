@@ -9,6 +9,7 @@ import ConfirmModal from '@/components/ConfirmModal.vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseSkeleton from '@/components/ui/BaseSkeleton.vue'
 import BaseSwitch from '@/components/ui/BaseSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -1196,11 +1197,8 @@ async function handleTestOffline() {
           </div>
         </div>
 
-        <div v-if="accountsLoading && accounts.length === 0" class="ds-card flex flex-col items-center justify-center py-12 text-[var(--color-text-secondary)]">
-          <div class="i-svg-spinners-90-ring-with-bg mb-2 text-3xl text-[var(--theme-primary)]" />
-          <div class="text-sm">
-            加载中...
-          </div>
+        <div v-if="accountsLoading && accounts.length === 0" class="ds-card overflow-hidden">
+          <BaseSkeleton card :rows="4" row-height="16px" />
         </div>
 
         <EmptyState
@@ -1447,9 +1445,8 @@ async function handleTestOffline() {
           </h3>
         </div>
 
-        <div v-if="settingsLoading" class="py-4 text-center text-gray-500">
-          <div class="i-svg-spinners-ring-resize mx-auto mb-2 text-2xl" />
-          <p>加载中...</p>
+        <div v-if="settingsLoading" class="py-2">
+          <BaseSkeleton :rows="3" gap="0.5rem" />
         </div>
 
         <div v-else-if="!currentAccountId" class="py-8 text-center text-gray-500">
@@ -1687,9 +1684,8 @@ async function handleTestOffline() {
           </h3>
         </div>
 
-        <div v-if="settingsLoading" class="py-4 text-center text-gray-500">
-          <div class="i-svg-spinners-ring-resize mx-auto mb-2 text-2xl" />
-          <p>加载中...</p>
+        <div v-if="settingsLoading" class="py-2">
+          <BaseSkeleton :rows="3" gap="0.5rem" />
         </div>
 
         <div v-else-if="!currentAccountId" class="py-8 text-center text-gray-500">
@@ -2035,8 +2031,8 @@ async function handleTestOffline() {
         </div>
 
         <!-- 模板列表 -->
-        <div v-if="templateLoading" class="py-4 text-center text-gray-500">
-          加载中...
+        <div v-if="templateLoading" class="py-2">
+          <BaseSkeleton :rows="2" gap="0.5rem" />
         </div>
         <div v-else-if="!templates.length" class="py-4 text-center text-gray-500">
           暂无模板

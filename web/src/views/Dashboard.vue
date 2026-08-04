@@ -6,6 +6,7 @@ import api from '@/api'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import BaseSkeleton from '@/components/ui/BaseSkeleton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
@@ -15,6 +16,7 @@ import { useToastStore } from '@/stores/toast'
 import { useUserStore } from '@/stores/user'
 
 const statusStore = useStatusStore()
+const statusLoading = computed(() => statusStore.loading)
 const accountStore = useAccountStore()
 const bagStore = useBagStore()
 const toastStore = useToastStore()
@@ -519,7 +521,13 @@ useIntervalFn(updateCountdowns, 1000)
       </template>
     </PageHeader>
 
-    <div class="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+    <BaseSkeleton
+      v-if="statusLoading && !status?.status"
+      card
+      :rows="5"
+      row-height="16px"
+    />
+    <div v-else class="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
       <!-- Profile + assets -->
       <section class="ds-card p-5">
         <div class="flex flex-col gap-5 lg:flex-row lg:items-stretch">

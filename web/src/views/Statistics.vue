@@ -2,6 +2,7 @@
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
 import { useToastStore } from '@/stores/toast'
@@ -21,6 +22,7 @@ const toast = useToastStore()
 const { currentAccountId, currentAccount } = storeToRefs(accountStore)
 
 const loading = ref(false)
+const loadError = ref('')
 const range = ref(30)
 const points = ref<TrendPoint[]>([])
 
@@ -56,7 +58,7 @@ async function loadTrend() {
   }
   catch (error: any) {
     points.value = []
-    toast.error(error?.response?.data?.error || '无法读取收益趋势')
+    loadError.value = error?.response?.data?.error || error?.message || '无法读取收益趋势'
   }
   finally {
     loading.value = false
@@ -104,9 +106,12 @@ function formatAxis(value: number) {
   <div class="ds-page">
     <PageHeader title="收益统计" subtitle="金币、经验与操作数的历史趋势" />
 
-    <div v-if="!currentAccountId" class="rounded-lg bg-white p-8 text-center text-gray-500 shadow dark:bg-gray-800">
-      请选择账号后查看收益统计
-    </div>
+    <EmptyState
+      v-if="!currentAccountId"
+      icon="i-carbon-user-avatar"
+      title="请选择账号"
+      description="选择账号后即可查看收益统计"
+    />
 
     <div v-else>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -130,16 +135,23 @@ function formatAxis(value: number) {
         </div>
       </div>
 
-      <div v-if="loading" class="flex justify-center py-16">
-        <div class="i-svg-spinners-90-ring-with-bg text-4xl text-[var(--theme-primary)]" />
-      </div>
+      <EmptyState v-if="loading" loading title="正在加载收益统计..." />
 
-      <div v-else-if="!hasData" class="rounded-lg bg-white p-8 text-center text-gray-500 shadow dark:bg-gray-800">
-        <div class="mb-2 text-3xl">
-          <div class="i-carbon-chart-line inline-block" />
-        </div>
-        暂无统计历史。机器人运行并保存统计后，这里将展示金币、经验与操作数趋势。
-      </div>
+      <EmptyState
+        v-else-if="loadError"
+        error
+        title="收益统计加载失败"
+        :description="loadError"
+        retry-text="重新加载"
+        @retry="loadTrend"
+      />
+
+      <EmptyState
+        v-else-if="!hasData"
+        icon="i-carbon-chart-line"
+        title="暂无统计历史"
+        description="机器人运行并保存统计后，这里将展示金币、经验与操作数趋势"
+      />
 
       <div v-else class="space-y-4">
         <!-- 汇总卡片 -->

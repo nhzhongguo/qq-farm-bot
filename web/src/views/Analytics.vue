@@ -3,6 +3,7 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
 import { usePlantBlacklistStore } from '@/stores/plant-blacklist'
@@ -18,6 +19,7 @@ const { blacklist } = storeToRefs(plantBlacklistStore)
 const { status } = storeToRefs(statusStore)
 
 const loading = ref(false)
+const loadError = ref('')
 const list = ref<any[]>([])
 const sortKey = ref('exp')
 const imageErrors = ref<Record<string | number, boolean>>({})
@@ -225,7 +227,8 @@ async function loadAnalytics() {
       list.value = []
     }
   }
-  catch (e) {
+  catch (e: any) {
+    loadError.value = e?.response?.data?.error || e?.message || '无法加载分析数据'
     console.error(e)
     list.value = []
   }
@@ -277,6 +280,7 @@ onMounted(() => {
 })
 
 watch([currentAccountId, sortKey], () => {
+  loadError.value = ''
   loadAnalytics()
 })
 
@@ -357,17 +361,30 @@ function formatGrowTime(seconds: any) {
     </div>
 
     <div>
-      <div v-if="loading" class="flex justify-center py-12">
-        <div class="i-svg-spinners-90-ring-with-bg text-4xl text-blue-500" />
-      </div>
+      <EmptyState v-if="loading" loading title="正在加载分析数据..." />
 
-      <div v-else-if="!currentAccountId" class="rounded-lg bg-white p-8 text-center text-gray-500 shadow dark:bg-gray-800">
-        请选择账号后查看数据分析
-      </div>
+      <EmptyState
+        v-else-if="loadError"
+        error
+        title="数据加载失败"
+        :description="loadError"
+        retry-text="重新加载"
+        @retry="loadAnalytics"
+      />
 
-      <div v-else-if="list.length === 0" class="rounded-lg bg-white p-8 text-center text-gray-500 shadow dark:bg-gray-800">
-        暂无数据
-      </div>
+      <EmptyState
+        v-else-if="!currentAccountId"
+        icon="i-carbon-user-avatar"
+        title="请选择账号"
+        description="选择账号后即可查看数据分析"
+      />
+
+      <EmptyState
+        v-else-if="list.length === 0"
+        icon="i-carbon-chart-line"
+        title="暂无数据"
+        description="当前账号还没有作物分析数据"
+      />
 
       <div v-else-if="activeTab === 'crops'" class="space-y-4">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
