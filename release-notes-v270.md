@@ -36,4 +36,4 @@
 
 ---
 
-> 完整功能说明见 [README](https://github.com/nhzhongguo/qq-farm-bot)。
+> 完整功能说明见 [README](https://github.com/yuchen0x1/qq-farm-bot)。

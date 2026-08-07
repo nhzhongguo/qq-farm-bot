@@ -6,7 +6,7 @@
 
 > 多账号 QQ 农场自动化托管平台 —— 挂机 · 看板 · 告警 · 运维，一套自托管方案全搞定。
 
-[![version](https://img.shields.io/badge/version-v2.7.0-blue)](https://github.com/nhzhongguo/qq-farm-bot/releases)
+[![version](https://img.shields.io/badge/version-v2.7.0-blue)](https://github.com/yuchen0x1/qq-farm-bot/releases)
 [![Node](https://img.shields.io/badge/Node.js-20%2B-339933)](https://nodejs.org)
 [![Vue](https://img.shields.io/badge/Frontend-Vue3-42b883)](https://vuejs.org)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ed)](https://www.docker.com)
@@ -107,7 +107,7 @@ QQ Farm Bot 是一套面向**长期挂机场景**的多账号农场自动化管�
 ### 🪟 Windows
 
 ```powershell
-git clone https://github.com/nhzhongguo/qq-farm-bot.git
+git clone https://github.com/yuchen0x1/qq-farm-bot.git
 cd qq-farm-bot
 
 corepack enable
@@ -120,7 +120,7 @@ pnpm dev:core
 ### 🐧 Linux
 
 ```bash
-git clone https://github.com/nhzhongguo/qq-farm-bot.git
+git clone https://github.com/yuchen0x1/qq-farm-bot.git
 cd qq-farm-bot
 
 corepack enable

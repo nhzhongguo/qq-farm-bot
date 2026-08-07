@@ -284,7 +284,7 @@ onMounted(() => {
       <section class="hidden lg:block">
         <div class="ds-chip ds-chip-brand mb-5">
           <div class="i-carbon-sprout" />
-          QQ农场智能助手
+          QQ Farm Bot
         </div>
         <h1 class="max-w-xl text-4xl text-[var(--color-text-primary)] font-bold tracking-tight xl:text-5xl">
           多账号自动化运营台

@@ -24,4 +24,4 @@
 
 ---
 
-> 完整功能说明见 [README](https://github.com/nhzhongguo/qq-farm-bot)。本版本为「多渠道告警推送与收益趋势」里程碑：19 渠道整合、统计页、写入合并与 E2E 质量门。
+> 完整功能说明见 [README](https://github.com/yuchen0x1/qq-farm-bot)。本版本为「多渠道告警推送与收益趋势」里程碑：19 渠道整合、统计页、写入合并与 E2E 质量门。

@@ -418,7 +418,7 @@ async function copyToken() {
       <div class="flex items-center gap-3">
         <div class="i-carbon-sprout text-2xl" :style="{ color: 'var(--theme-primary)' }" />
         <span class="bg-clip-text text-lg text-transparent font-bold" :style="{ backgroundImage: 'var(--theme-gradient)' }">
-          QQ农场智能助手
+          QQ Farm Bot
         </span>
       </div>
       <!-- Mobile Close Button -->
@@ -743,7 +743,7 @@ async function copyToken() {
           <div class="flex items-center gap-2">
             <span>Web v{{ version }}</span>
             <a
-              href="https://github.com/nhzhongguo/qq-farm-automation-bot-private"
+              href="https://github.com/yuchen0x1/qq-farm-bot"
               target="_blank"
               rel="noopener noreferrer"
               title="开源地址"

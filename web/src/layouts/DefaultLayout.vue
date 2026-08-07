@@ -22,7 +22,7 @@ const { sidebarOpen } = storeToRefs(appStore)
         <div class="flex items-center gap-2">
           <div class="i-carbon-sprout text-xl text-[var(--theme-primary)]" />
           <div class="text-base font-bold tracking-tight">
-            QQ农场智能助手
+            QQ Farm Bot
           </div>
         </div>
         <button
