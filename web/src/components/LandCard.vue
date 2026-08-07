@@ -127,6 +127,7 @@ function getPlantSizeText(land: any) {
       <img
         v-if="land.seedImage"
         :src="getSafeImageUrl(land.seedImage)"
+        :alt="land.plantName || '作物'"
         class="max-h-full max-w-full object-contain"
         loading="lazy"
         referrerpolicy="no-referrer"

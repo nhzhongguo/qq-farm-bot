@@ -16,6 +16,7 @@ function selectTheme(theme: Theme) {
     <button
       class="icon-btn mx-2 !outline-none"
       title="主题设置"
+      aria-label="主题设置"
       @click="appStore.toggleThemePanel()"
     >
       <div i-carbon-color-palette />

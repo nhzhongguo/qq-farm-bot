@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, toRef } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 
 const props = defineProps<{
   show: boolean
@@ -19,6 +20,8 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
+const { setContainer } = useFocusTrap(toRef(props, 'show'))
+
 function onCancel() {
   emit('cancel')
   emit('close')
@@ -34,7 +37,16 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm" @click="!loading && onCancel()">
+  <div
+    v-if="show"
+    :ref="setContainer"
+    role="dialog"
+    aria-modal="true"
+    :aria-labelledby="`confirm-title-${type || 'default'}`"
+    :aria-describedby="`confirm-message-${type || 'default'}`"
+    class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm"
+    @click="!loading && onCancel()"
+  >
     <div class="ds-surface-solid max-w-md w-full p-6 shadow-[var(--shadow-lg)]" @click.stop>
       <div class="mb-4 flex items-start gap-3">
         <div
@@ -48,10 +60,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           <div :class="type === 'danger' ? 'i-carbon-warning' : (type === 'success' ? 'i-carbon-checkmark' : 'i-carbon-information')" />
         </div>
         <div class="min-w-0 flex-1">
-          <h3 class="text-lg text-[var(--color-text-primary)] font-bold">
+          <h3 :id="`confirm-title-${type || 'default'}`" class="text-lg text-[var(--color-text-primary)] font-bold">
             {{ title || '确认操作' }}
           </h3>
-          <p class="mt-2 whitespace-pre-line text-sm text-[var(--color-text-secondary)] leading-relaxed">
+          <p :id="`confirm-message-${type || 'default'}`" class="mt-2 whitespace-pre-line text-sm text-[var(--color-text-secondary)] leading-relaxed">
             {{ message || '确定要执行此操作吗？' }}
           </p>
         </div>

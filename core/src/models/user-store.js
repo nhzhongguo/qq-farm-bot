@@ -346,8 +346,14 @@ function needsRehash(storedPassword) {
 const generateCardCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
-    for (let i = 0; i < 16; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    while (code.length < 16) {
+        const bytes = crypto.randomBytes(32);
+        for (const byte of bytes) {
+            if (byte < 252) {
+                code += chars[byte % chars.length];
+                if (code.length === 16) break;
+            }
+        }
     }
     return code;
 };
@@ -393,7 +399,8 @@ function initDefaultAdmin() {
     loadUsers();
     const adminExists = users.find(u => u.username === 'admin');
     if (!adminExists) {
-        const defaultPassword = 'admin';
+        const configuredPassword = String(process.env.ADMIN_INITIAL_PASSWORD || '').trim();
+        const defaultPassword = configuredPassword || 'admin';
         users.push({
             username: 'admin',
             password: hashPassword(defaultPassword),
@@ -402,7 +409,11 @@ function initDefaultAdmin() {
             createdAt: Date.now()
         });
         saveUsers();
-        console.log('[用户系统] 已创建默认管理员账号，默认密码: admin');
+        if (configuredPassword) {
+            console.log('[用户系统] 已创建默认管理员账号，请使用 ADMIN_INITIAL_PASSWORD 对应的密码登录');
+        } else {
+            console.log('[用户系统] 已创建默认管理员账号，默认密码: admin');
+        }
     } else if (verifyPassword('admin', adminExists.password) && adminExists.mustChangePassword !== true) {
         adminExists.mustChangePassword = true;
         saveUsers();
@@ -504,6 +515,22 @@ function validateUserWithoutPassword(username, ip = 'unknown') {
     };
 }
 
+function getUserSnapshot(username) {
+    loadUsers();
+    const user = users.find(u => u.username === username);
+    if (!user) return null;
+    return {
+        username: user.username,
+        role: user.role,
+        cardCode: user.cardCode || null,
+        card: user.card || null,
+        accountLimit: user.accountLimit || DEFAULT_ACCOUNT_LIMIT,
+        pushLimit: user.pushLimit || 50,
+        operationRateLimit: user.operationRateLimit || 30,
+        mustChangePassword: user.mustChangePassword === true,
+    };
+}
+
 function registerUser(username, password, cardCode) {
     loadUsers();
     loadCards();
@@ -566,6 +593,7 @@ function registerUser(username, password, cardCode) {
     card.usedAt = now;
     delete card.claimedAt;
     delete card.claimIdentityHash;
+    delete card.claimIpHash;
 
     saveUsers();
     saveCards();
@@ -657,6 +685,7 @@ function renewUser(username, cardCode) {
     card.usedAt = now;
     delete card.claimedAt;
     delete card.claimIdentityHash;
+    delete card.claimIpHash;
 
     saveUsers();
     saveCards();
@@ -960,12 +989,17 @@ function setCardClaimStatus(enabled) {
     return { enabled: cardClaimEnabled };
 }
 
-function checkUAClaimLimit(identity) {
+function hashClaimIdentity(value) {
+    return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function checkUAClaimLimit(identity, ip) {
     loadCardClaimRecords();
     const now = Date.now();
-    const identityHash = crypto.createHash('sha256').update(identity).digest('hex');
+    const identityHash = hashClaimIdentity(identity);
+    const ipHash = ip ? hashClaimIdentity(ip) : null;
     
-    const record = cardClaimRecords.find(r => r.identityHash === identityHash || r.uaHash === identityHash);
+    const record = cardClaimRecords.find(r => r.identityHash === identityHash || r.uaHash === identityHash || (ipHash && r.ipHash === ipHash));
     if (record) {
         const elapsed = now - record.claimTime;
         if (elapsed < CARD_CLAIM_WINDOW_MS) {
@@ -987,13 +1021,14 @@ function releaseExpiredCardReservations(now = Date.now()) {
         if (!card.usedBy && card.claimedAt && now - card.claimedAt >= CARD_CLAIM_WINDOW_MS) {
             delete card.claimedAt;
             delete card.claimIdentityHash;
+            delete card.claimIpHash;
             changed = true;
         }
     }
     if (changed) saveCards();
 }
 
-function claimCardByUA(identity, username = null) {
+function claimCardByUA(identity, username = null, ip = null) {
     loadCards();
     loadCardClaimRecords();
     releaseExpiredCardReservations();
@@ -1002,7 +1037,8 @@ function claimCardByUA(identity, username = null) {
         return { ok: false, error: '卡密领取功能未开启' };
     }
     
-    const uaCheck = checkUAClaimLimit(identity);
+    const normalizedIp = String(ip || '').trim() || String(identity).split('|')[0].trim();
+    const uaCheck = checkUAClaimLimit(identity, normalizedIp);
     if (!uaCheck.allowed) {
         return { ok: false, error: uaCheck.message, remainingMs: uaCheck.remainingMs };
     }
@@ -1019,15 +1055,18 @@ function claimCardByUA(identity, username = null) {
         return { ok: false, error: '卡密库存不足，请联系管理员！' };
     }
     
-    const randomIndex = Math.floor(Math.random() * unusedTimeCards.length);
+    const randomIndex = crypto.randomInt(unusedTimeCards.length);
     const selectedCard = unusedTimeCards[randomIndex];
     
-    const identityHash = crypto.createHash('sha256').update(identity).digest('hex');
+    const identityHash = hashClaimIdentity(identity);
+    const ipHash = hashClaimIdentity(normalizedIp);
     selectedCard.claimedAt = Date.now();
     selectedCard.claimIdentityHash = identityHash;
+    selectedCard.claimIpHash = ipHash;
     saveCards();
     cardClaimRecords.push({
         identityHash,
+        ipHash,
         claimTime: Date.now(),
         cardCode: selectedCard.code,
         username: username || null
@@ -1142,6 +1181,7 @@ function clearCardLogs() {
 module.exports = {
     validateUser,
     validateUserWithoutPassword,
+    getUserSnapshot,
     registerUser,
     renewUser,
     getAllUsers,

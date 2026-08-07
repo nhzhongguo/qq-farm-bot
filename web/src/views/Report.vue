@@ -9,6 +9,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
 import { useToastStore } from '@/stores/toast'
+import { cachedGet } from '@/utils/request'
 
 type ReportType = 'daily' | 'weekly' | 'compare'
 
@@ -124,14 +125,11 @@ async function loadReport() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const { data } = await api.get('/api/report', { params: currentParams.value })
-    if (data?.ok && data.data) {
-      payload.value = data.data
+    const report = await cachedGet<ReportPayload>('/api/report', currentParams.value as Record<string, unknown>, { ttl: 60000 })
+    if (report) {
+      payload.value = report
     }
-    else {
-      payload.value = null
-      errorMsg.value = String(data?.error || '报表生成失败')
-    }
+    payload.value = report || null
   }
   catch (error: any) {
     payload.value = null
@@ -276,7 +274,7 @@ onMounted(async () => {
       </div>
 
       <!-- 筛选区 -->
-      <div class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-card)] p-4">
+      <div class="mb-4 flex flex-wrap items-end gap-3 border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-card)] p-4">
         <BaseInput v-if="reportType === 'daily'" v-model="dailyDate" label="日期" type="date" />
         <template v-else-if="reportType === 'weekly'">
           <BaseInput v-model="weekStart" label="开始日期" type="date" />
@@ -285,12 +283,12 @@ onMounted(async () => {
         <template v-else>
           <BaseSelect v-model="compareDays" label="对比窗口" :options="daysOptions" />
           <div class="flex flex-col gap-1.5">
-            <span class="text-sm font-medium text-[var(--color-text-secondary)]">对比账号</span>
-            <div class="flex max-w-md flex-wrap gap-2">
+            <span class="text-sm text-[var(--color-text-secondary)] font-medium">对比账号</span>
+            <div class="max-w-md flex flex-wrap gap-2">
               <label
                 v-for="acc in accounts"
                 :key="acc.id"
-                class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--color-border-default)] px-2.5 py-1.5 text-sm"
+                class="flex cursor-pointer items-center gap-1.5 border border-[var(--color-border-default)] rounded-lg px-2.5 py-1.5 text-sm"
                 :class="compareAccountIds.includes(String(acc.id)) ? 'border-[var(--theme-primary)] bg-[rgba(var(--theme-primary-rgb),0.1)]' : 'bg-[var(--color-bg-subtle)]'"
               >
                 <input
@@ -317,7 +315,7 @@ onMounted(async () => {
       </div>
 
       <!-- 错误态 -->
-      <div v-if="errorMsg" class="mb-4 rounded-xl border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 px-4 py-3 text-sm text-[var(--color-danger)]">
+      <div v-if="errorMsg" class="mb-4 border border-[var(--color-danger)]/30 rounded-xl bg-[var(--color-danger)]/5 px-4 py-3 text-sm text-[var(--color-danger)]">
         {{ errorMsg }}
       </div>
 
@@ -336,9 +334,9 @@ onMounted(async () => {
 
       <!-- 单账号报表 -->
       <div v-else-if="!isComparePayload(payload)" class="space-y-4">
-        <div class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-card)] p-4">
+        <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-card)] p-4">
           <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h3 class="font-semibold text-[var(--color-text-primary)]">
+            <h3 class="text-[var(--color-text-primary)] font-semibold">
               {{ payload.period === 'weekly' ? '周报' : '日报' }}：{{ accountName(payload.accountId) }}
             </h3>
             <span class="text-sm text-[var(--color-text-secondary)]">
@@ -348,14 +346,20 @@ onMounted(async () => {
 
           <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div v-for="row in summaryRows" :key="row.key" class="rounded-lg bg-[var(--color-bg-subtle)] px-3 py-2">
-              <div class="text-xs text-[var(--color-text-secondary)]">{{ row.label }}</div>
-              <div class="mt-0.5 text-lg font-semibold text-[var(--color-text-primary)]">{{ row.value ?? 0 }}</div>
+              <div class="text-xs text-[var(--color-text-secondary)]">
+                {{ row.label }}
+              </div>
+              <div class="mt-0.5 text-lg text-[var(--color-text-primary)] font-semibold">
+                {{ row.value ?? 0 }}
+              </div>
             </div>
           </div>
         </div>
 
-        <div v-if="operationRows.length" class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-card)] p-4">
-          <h4 class="mb-3 font-semibold text-[var(--color-text-primary)]">操作明细</h4>
+        <div v-if="operationRows.length" class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-card)] p-4">
+          <h4 class="mb-3 text-[var(--color-text-primary)] font-semibold">
+            操作明细
+          </h4>
           <div class="flex flex-wrap gap-2">
             <span
               v-for="[op, count] in operationRows"
@@ -363,16 +367,18 @@ onMounted(async () => {
               class="rounded-lg bg-[var(--color-bg-subtle)] px-3 py-1.5 text-sm"
             >
               <span class="text-[var(--color-text-secondary)]">{{ op }}</span>
-              <span class="ml-2 font-semibold text-[var(--color-text-primary)]">{{ count }}</span>
+              <span class="ml-2 text-[var(--color-text-primary)] font-semibold">{{ count }}</span>
             </span>
           </div>
         </div>
 
-        <div v-if="payload.issues.length" class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-card)] p-4">
-          <h4 class="mb-3 font-semibold text-[var(--color-text-primary)]">异常明细（{{ payload.issues.length }}）</h4>
-          <ul class="space-y-2 text-sm">
+        <div v-if="payload.issues.length" class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-card)] p-4">
+          <h4 class="mb-3 text-[var(--color-text-primary)] font-semibold">
+            异常明细（{{ payload.issues.length }}）
+          </h4>
+          <ul class="text-sm space-y-2">
             <li v-for="(issue, idx) in payload.issues" :key="idx" class="flex flex-col gap-0.5 rounded-lg bg-[var(--color-bg-subtle)] px-3 py-2">
-              <span class="font-medium text-[var(--color-text-primary)]">{{ issue.taskName }}</span>
+              <span class="text-[var(--color-text-primary)] font-medium">{{ issue.taskName }}</span>
               <span class="text-xs text-[var(--color-text-tertiary)]">
                 {{ new Date(issue.startedAt).toLocaleString('zh-CN') }}
               </span>
@@ -381,22 +387,36 @@ onMounted(async () => {
           </ul>
         </div>
 
-        <div v-if="payload.trend.length" class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-card)] p-4">
-          <h4 class="mb-3 font-semibold text-[var(--color-text-primary)]">每日收益明细</h4>
+        <div v-if="payload.trend.length" class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-card)] p-4">
+          <h4 class="mb-3 text-[var(--color-text-primary)] font-semibold">
+            每日收益明细
+          </h4>
           <div class="overflow-x-auto">
-            <table class="w-full min-w-[420px] text-sm">
+            <table class="min-w-[420px] w-full text-sm">
               <thead>
                 <tr class="text-left text-xs text-[var(--color-text-secondary)]">
-                  <th class="pb-2 pr-4 font-medium">日期</th>
-                  <th class="pb-2 pr-4 font-medium">金币增量</th>
-                  <th class="pb-2 font-medium">经验增量</th>
+                  <th class="pb-2 pr-4 font-medium">
+                    日期
+                  </th>
+                  <th class="pb-2 pr-4 font-medium">
+                    金币增量
+                  </th>
+                  <th class="pb-2 font-medium">
+                    经验增量
+                  </th>
                 </tr>
               </thead>
               <tbody class="text-[var(--color-text-primary)]">
                 <tr v-for="point in payload.trend" :key="point.date" class="border-t border-[var(--color-border-default)]">
-                  <td class="py-2 pr-4">{{ point.date }}</td>
-                  <td class="py-2 pr-4">{{ point.goldGained }}</td>
-                  <td class="py-2">{{ point.expGained }}</td>
+                  <td class="py-2 pr-4">
+                    {{ point.date }}
+                  </td>
+                  <td class="py-2 pr-4">
+                    {{ point.goldGained }}
+                  </td>
+                  <td class="py-2">
+                    {{ point.expGained }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -405,16 +425,20 @@ onMounted(async () => {
       </div>
 
       <!-- 多账号对比 -->
-      <div v-else class="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-card)] p-4">
+      <div v-else class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-card)] p-4">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 class="font-semibold text-[var(--color-text-primary)]">多账号对比（{{ payload.range.start }} ~ {{ payload.range.end }}）</h3>
+          <h3 class="text-[var(--color-text-primary)] font-semibold">
+            多账号对比（{{ payload.range.start }} ~ {{ payload.range.end }}）
+          </h3>
           <span class="text-sm text-[var(--color-text-secondary)]">共 {{ payload.accounts.length }} 个账号</span>
         </div>
         <div class="overflow-x-auto">
-          <table class="w-full min-w-[480px] text-sm">
+          <table class="min-w-[480px] w-full text-sm">
             <thead>
               <tr class="text-left text-xs text-[var(--color-text-secondary)]">
-                <th class="pb-2 pr-4 font-medium">指标</th>
+                <th class="pb-2 pr-4 font-medium">
+                  指标
+                </th>
                 <th v-for="acc in payload.accounts" :key="acc.accountId" class="pb-2 pr-4 font-medium">
                   {{ accountName(acc.accountId) }}
                 </th>
@@ -422,7 +446,9 @@ onMounted(async () => {
             </thead>
             <tbody class="text-[var(--color-text-primary)]">
               <tr v-for="metric in compareMetrics.metrics" :key="metric" class="border-t border-[var(--color-border-default)]">
-                <td class="py-2 pr-4 text-[var(--color-text-secondary)]">{{ (compareMetrics.labels || {})[metric] || metric }}</td>
+                <td class="py-2 pr-4 text-[var(--color-text-secondary)]">
+                  {{ (compareMetrics.labels || {})[metric] || metric }}
+                </td>
                 <td v-for="acc in payload.accounts" :key="acc.accountId" class="py-2 pr-4">
                   {{ acc.summary[metric] ?? 0 }}
                 </td>

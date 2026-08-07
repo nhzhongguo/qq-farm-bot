@@ -69,17 +69,26 @@ async function generateDiagnostic() {
 }
 const clearingLogs = ref(false)
 
+const accountLogErrorActions = new Set(['Error', 'error', 'start_failed', 'stop_failed', 'kickout_stop', 'relogin_failed'])
+
+function mapAccountLog(l: any) {
+  const ts = new Date(l.time).getTime()
+  const accountPrefix = l.accountName ? `[${l.accountName}]` : ''
+  const reason = l.reason ? ` (${l.reason})` : ''
+  const isError = accountLogErrorActions.has(String(l.action || ''))
+  return {
+    ts,
+    time: l.time,
+    tag: isError ? '错误' : '系统',
+    msg: [accountPrefix, l.msg, reason].filter(Boolean).join(' '),
+    meta: { event: String(l.action || '') },
+  }
+}
+
 const allLogs = computed(() => {
   const sLogs = statusLogs.value || []
-  const aLogs = (statusAccountLogs.value || []).map((l: any) => ({
-    ts: new Date(l.time).getTime(),
-    time: l.time,
-    tag: l.action === 'Error' ? '错误' : '系统',
-    msg: l.reason ? `${l.msg} (${l.reason})` : l.msg,
-    isAccountLog: true,
-  }))
-
-  return [...sLogs, ...aLogs].sort((a: any, b: any) => a.ts - b.ts).filter((l: any) => !l.isAccountLog)
+  const aLogs = (statusAccountLogs.value || []).map(mapAccountLog)
+  return [...sLogs, ...aLogs].sort((a: any, b: any) => a.ts - b.ts)
 })
 
 const filter = reactive({
@@ -211,6 +220,21 @@ const timeToLevel = computed(() => {
     return `约 ${Math.ceil(minsToLevel)} 分钟后升级`
   return `约 ${(minsToLevel / 60).toFixed(1)} 小时后升级`
 })
+
+const uptimeText = computed(() => formatDuration(status.value?.uptime || 0))
+
+const activeAutomationCount = computed(() => {
+  const automation = status.value?.automation || {}
+  return Object.values(automation).filter((v: unknown) => typeof v === 'boolean' && v).length
+})
+
+const recentWarnCount = computed(() => {
+  const statusWarns = (statusLogs.value || []).filter((l: any) => l.isWarn).length
+  const accountWarns = (statusAccountLogs.value || []).filter((l: any) => accountLogErrorActions.has(String(l.action || ''))).length
+  return statusWarns + accountWarns
+})
+
+const todayOperations = computed(() => status.value?.operations || {})
 
 // Fertilizer & Collection
 const fertilizerNormal = computed(() => dashboardItems.value.find((i: any) => Number(i.id) === 1011))
@@ -522,213 +546,258 @@ useIntervalFn(updateCountdowns, 1000)
     </PageHeader>
 
     <BaseSkeleton
-      v-if="statusLoading && !status?.status"
+      v-if="statusLoading && !status"
       card
       :rows="5"
       row-height="16px"
     />
-    <div v-else class="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
-      <!-- Profile + assets -->
-      <section class="ds-card p-5">
-        <div class="flex flex-col gap-5 lg:flex-row lg:items-stretch">
-          <div class="min-w-0 flex-1">
-            <div class="mb-2 flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
-              <div class="i-carbon-user-avatar" />
-              当前账号
-            </div>
-            <div class="truncate text-2xl font-bold tracking-tight" :title="displayName">
-              {{ displayName }}
-            </div>
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-              <span class="ds-chip ds-chip-brand">Lv.{{ status?.status?.level || 0 }}</span>
-              <span class="ds-chip">效率 {{ expRate }}</span>
-              <span class="ds-chip">{{ timeToLevel }}</span>
-            </div>
-            <div class="mt-5">
-              <div class="mb-1.5 flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
-                <span class="inline-flex items-center gap-1"><div class="i-fas-bolt text-[var(--theme-primary)]" /> EXP</span>
-                <span>{{ status?.levelProgress?.current || 0 }} / {{ status?.levelProgress?.needed || '?' }}</span>
-              </div>
-              <div class="h-2 overflow-hidden rounded-full bg-[var(--color-bg-subtle)]">
-                <div
-                  class="h-full rounded-full transition-all duration-500"
-                  :style="{ width: `${getExpPercent(status?.levelProgress)}%`, backgroundImage: 'var(--theme-gradient)' }"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-3 min-w-0 flex-1 gap-2">
-            <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
-              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]">
-                <div class="i-fas-coins text-yellow-500" />金币
-              </div>
-              <div class="mt-2 text-lg text-yellow-600 font-bold dark:text-yellow-400">
-                {{ status?.status?.gold || 0 }}
-              </div>
-            </div>
-            <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
-              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]">
-                <div class="i-carbon-ticket text-sky-500" />点券
-              </div>
-              <div class="mt-2 text-lg font-bold">
-                {{ status?.status?.coupon || 0 }}
-              </div>
-            </div>
-            <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
-              <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]">
-                <div class="i-carbon-circle-filled text-amber-500" />金豆
-              </div>
-              <div class="mt-2 text-lg font-bold">
-                {{ status?.status?.goldBean || 0 }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Next checks -->
-      <section class="ds-card p-5">
-        <div class="mb-4 flex items-center gap-2 text-lg font-semibold">
-          <div class="i-carbon-hourglass text-[var(--theme-primary)]" />
-          下次巡查
-        </div>
-        <div class="space-y-3">
-          <div class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-3">
-            <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-              <div class="i-carbon-sprout text-[var(--color-success)]" />
-              农场
-            </div>
-            <div class="text-base font-bold font-mono">
-              {{ nextFarmCheck }}
-            </div>
-          </div>
-          <div class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-3">
-            <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-              <div class="i-carbon-user-multiple text-[var(--theme-primary)]" />
-              好友
-            </div>
-            <div class="text-base font-bold font-mono">
-              {{ nextFriendCheck }}
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <div class="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
-      <!-- Logs -->
-      <section class="ds-card min-h-[28rem] flex flex-col overflow-hidden">
-        <div class="flex flex-col gap-3 border-b border-[var(--color-border-default)] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div class="flex items-center gap-2 text-lg font-semibold">
-            <div class="i-carbon-cloud-logging text-[var(--theme-primary)]" />
-            运行日志
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <BaseSelect v-model="filter.module" class="w-36" :options="modules" @update:model-value="onLogFilterChange" />
-            <BaseSelect v-model="filter.event" class="w-40" :options="events" @update:model-value="onLogFilterChange" />
-            <BaseSelect v-model="filter.isWarn" class="w-32" :options="logs" @update:model-value="onLogFilterChange" />
-            <BaseInput v-model="filter.keyword" class="w-40" placeholder="关键词" @keyup.enter="onLogSearchTrigger" />
-            <BaseButton variant="secondary" size="sm" @click="onLogSearchTrigger">
-              筛选
-            </BaseButton>
-            <BaseButton variant="danger" size="sm" :loading="clearingLogs" @click="clearLogs">
-              清空
-            </BaseButton>
-          </div>
-        </div>
-
-        <div ref="logContainer" class="custom-scrollbar flex-1 overflow-y-auto p-4 text-xs leading-6 font-mono" @scroll="onLogScroll">
-          <EmptyState
-            v-if="!allLogs.length"
-            icon="i-carbon-document-blank"
-            title="暂无日志"
-            description="运行账号后，实时日志会显示在这里"
-          />
-          <div v-for="log in allLogs" :key="`${log.ts}-${log.tag}-${log.msg}`" class="mb-1 break-all">
-            <span class="mr-2 select-none text-[var(--color-text-tertiary)]">[{{ formatLogTime(log.time) }}]</span>
-            <span class="mr-2 rounded px-1.5 py-0.5 text-[10px] font-bold" :class="getLogTagClass(log.tag)">{{ log.tag }}</span>
-            <span v-if="log.meta?.event" class="mr-2 rounded bg-[rgba(var(--theme-primary-rgb),0.1)] px-1.5 py-0.5 text-[10px] text-[var(--theme-primary)]">{{ getEventLabel(log.meta.event) }}</span>
-            <span :class="getLogMsgClass(log.tag)">{{ log.msg }}</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Today stats + bags -->
-      <div class="flex flex-col gap-4">
+    <div v-else class="flex flex-col gap-4">
+      <!-- 首屏健康聚合：健康 / 运行中任务 / 异常 / 今日收益 -->
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <section class="ds-card p-4">
-          <div class="mb-3 flex items-center gap-2 text-lg font-semibold">
-            <div class="i-carbon-chart-column text-[var(--theme-primary)]" />
-            今日统计
+          <div class="flex items-center gap-1.5 text-xs text-[var(--color-text-tertiary)]">
+            <div class="i-carbon-health-cross text-[var(--color-success)]" />
+            账号健康
           </div>
-          <EmptyState
-            v-if="!status?.connection?.connected"
-            icon="i-carbon-connection-signal-off"
-            title="账号未登录"
-            description="请先运行账号或检查网络连接"
-          />
-          <div v-else class="grid grid-cols-2 gap-2">
-            <div
-              v-for="(val, key) in filteredOperations"
-              :key="key"
-              class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-2"
-            >
-              <div class="flex items-center gap-2">
-                <div class="text-base" :class="[getOpIcon(key), getOpColor(key)]" />
-                <div class="text-xs text-[var(--color-text-secondary)]">
-                  {{ getOpName(key) }}
+          <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span class="text-xl font-bold" :class="status?.connection?.connected ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'">
+              {{ status?.connection?.connected ? '连接正常' : '未连接' }}
+            </span>
+            <span class="text-xs text-[var(--color-text-tertiary)]">已运行 {{ uptimeText }}</span>
+          </div>
+        </section>
+        <section class="ds-card p-4">
+          <div class="flex items-center gap-1.5 text-xs text-[var(--color-text-tertiary)]">
+            <div class="i-carbon-task-complete text-[var(--theme-primary)]" />
+            运行中任务
+          </div>
+          <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span class="text-xl font-bold">{{ activeAutomationCount }}</span>
+            <span class="text-xs text-[var(--color-text-tertiary)]">项自动化功能开启</span>
+          </div>
+        </section>
+        <section class="ds-card p-4">
+          <div class="flex items-center gap-1.5 text-xs text-[var(--color-text-tertiary)]">
+            <div class="i-carbon-warning-alt" :class="recentWarnCount > 0 ? 'text-[var(--color-warning)]' : 'text-[var(--color-text-tertiary)]'" />
+            近期异常
+          </div>
+          <div class="mt-2 text-xl font-bold" :class="recentWarnCount > 0 ? 'text-[var(--color-warning)]' : ''">
+            {{ recentWarnCount }} 条
+          </div>
+        </section>
+        <section class="ds-card p-4">
+          <div class="flex items-center gap-1.5 text-xs text-[var(--color-text-tertiary)]">
+            <div class="i-carbon-crop-growth text-[var(--color-farm-ripe)]" />
+            今日收益
+          </div>
+          <div class="mt-2 text-sm font-bold">
+            收获 {{ todayOperations.harvest || 0 }} 次 · 出售 {{ todayOperations.sell || 0 }} 次
+          </div>
+        </section>
+      </div>
+      <div class="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+        <!-- Profile + assets -->
+        <section class="ds-card p-5">
+          <div class="flex flex-col gap-5 lg:flex-row lg:items-stretch">
+            <div class="min-w-0 flex-1">
+              <div class="mb-2 flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
+                <div class="i-carbon-user-avatar" />
+                当前账号
+              </div>
+              <div class="truncate text-2xl font-bold tracking-tight" :title="displayName">
+                {{ displayName }}
+              </div>
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <span class="ds-chip ds-chip-brand">Lv.{{ status?.status?.level || 0 }}</span>
+                <span class="ds-chip">效率 {{ expRate }}</span>
+                <span class="ds-chip">{{ timeToLevel }}</span>
+              </div>
+              <div class="mt-5">
+                <div class="mb-1.5 flex items-center justify-between text-xs text-[var(--color-text-secondary)]">
+                  <span class="inline-flex items-center gap-1"><div class="i-fas-bolt text-[var(--theme-primary)]" /> EXP</span>
+                  <span>{{ status?.levelProgress?.current || 0 }} / {{ status?.levelProgress?.needed || '?' }}</span>
+                </div>
+                <div class="h-2 overflow-hidden rounded-full bg-[var(--color-bg-subtle)]">
+                  <div
+                    class="h-full rounded-full transition-all duration-500"
+                    :style="{ width: `${getExpPercent(status?.levelProgress)}%`, backgroundImage: 'var(--theme-gradient)' }"
+                  />
                 </div>
               </div>
-              <div class="text-sm font-bold">
-                {{ val }}
+            </div>
+
+            <div class="grid grid-cols-3 min-w-0 flex-1 gap-2">
+              <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
+                <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]">
+                  <div class="i-fas-coins text-yellow-500" />金币
+                </div>
+                <div class="mt-2 text-lg text-yellow-600 font-bold dark:text-yellow-400">
+                  {{ status?.status?.gold || 0 }}
+                </div>
+              </div>
+              <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
+                <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]">
+                  <div class="i-carbon-ticket text-sky-500" />点券
+                </div>
+                <div class="mt-2 text-lg font-bold">
+                  {{ status?.status?.coupon || 0 }}
+                </div>
+              </div>
+              <div class="border border-[var(--color-border-default)] rounded-xl bg-[var(--color-bg-subtle)] p-3">
+                <div class="flex items-center gap-1 text-xs text-[var(--color-text-tertiary)]">
+                  <div class="i-carbon-circle-filled text-amber-500" />金豆
+                </div>
+                <div class="mt-2 text-lg font-bold">
+                  {{ status?.status?.goldBean || 0 }}
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section class="ds-card p-4">
-          <div class="mb-3 flex items-center gap-2 text-lg font-semibold">
-            <div class="i-carbon-inventory-management text-[var(--theme-primary)]" />
-            关键物资
+        <!-- Next checks -->
+        <section class="ds-card p-5">
+          <div class="mb-4 flex items-center gap-2 text-lg font-semibold">
+            <div class="i-carbon-hourglass text-[var(--theme-primary)]" />
+            下次巡查
           </div>
-          <div class="grid grid-cols-2 gap-2">
-            <div class="border border-[var(--color-border-default)] rounded-xl p-3">
-              <div class="text-xs text-[var(--color-text-tertiary)]">
-                普通化肥
+          <div class="space-y-3">
+            <div class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-3">
+              <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                <div class="i-carbon-sprout text-[var(--color-success)]" />
+                农场
               </div>
-              <div class="mt-1 text-lg font-bold">
-                {{ fertilizerNormal?.count || 0 }}
-              </div>
-            </div>
-            <div class="border border-[var(--color-border-default)] rounded-xl p-3">
-              <div class="text-xs text-[var(--color-text-tertiary)]">
-                有机化肥
-              </div>
-              <div class="mt-1 text-lg font-bold">
-                {{ fertilizerOrganic?.count || 0 }}
+              <div class="text-base font-bold font-mono">
+                {{ nextFarmCheck }}
               </div>
             </div>
-            <div class="border border-[var(--color-border-default)] rounded-xl p-3">
-              <div class="text-xs text-[var(--color-text-tertiary)]">
-                普通收藏
+            <div class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-3">
+              <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                <div class="i-carbon-user-multiple text-[var(--theme-primary)]" />
+                好友
               </div>
-              <div class="mt-1 text-lg font-bold">
-                {{ collectionNormal?.count || 0 }}
-              </div>
-            </div>
-            <div class="border border-[var(--color-border-default)] rounded-xl p-3">
-              <div class="text-xs text-[var(--color-text-tertiary)]">
-                稀有收藏
-              </div>
-              <div class="mt-1 text-lg font-bold">
-                {{ collectionRare?.count || 0 }}
+              <div class="text-base font-bold font-mono">
+                {{ nextFriendCheck }}
               </div>
             </div>
-          </div>
-          <div v-if="fertilizerNormal || fertilizerOrganic" class="mt-3 text-xs text-[var(--color-text-tertiary)]">
-            普通桶 {{ formatBucketTime(fertilizerNormal) }} · 有机桶 {{ formatBucketTime(fertilizerOrganic) }}
           </div>
         </section>
+      </div>
+
+      <div class="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
+        <!-- Logs -->
+        <section class="ds-card min-h-[28rem] flex flex-col overflow-hidden">
+          <div class="flex flex-col gap-3 border-b border-[var(--color-border-default)] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-2 text-lg font-semibold">
+              <div class="i-carbon-cloud-logging text-[var(--theme-primary)]" />
+              运行日志
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <BaseSelect v-model="filter.module" class="w-36" :options="modules" @update:model-value="onLogFilterChange" />
+              <BaseSelect v-model="filter.event" class="w-40" :options="events" @update:model-value="onLogFilterChange" />
+              <BaseSelect v-model="filter.isWarn" class="w-32" :options="logs" @update:model-value="onLogFilterChange" />
+              <BaseInput v-model="filter.keyword" class="w-40" placeholder="关键词" @keyup.enter="onLogSearchTrigger" />
+              <BaseButton variant="secondary" size="sm" @click="onLogSearchTrigger">
+                筛选
+              </BaseButton>
+              <BaseButton variant="danger" size="sm" :loading="clearingLogs" @click="clearLogs">
+                清空
+              </BaseButton>
+            </div>
+          </div>
+
+          <div ref="logContainer" class="custom-scrollbar flex-1 overflow-y-auto p-4 text-xs leading-6 font-mono" @scroll="onLogScroll">
+            <EmptyState
+              v-if="!allLogs.length"
+              icon="i-carbon-document-blank"
+              title="暂无日志"
+              description="运行账号后，实时日志会显示在这里"
+            />
+            <div v-for="log in allLogs" :key="`${log.ts}-${log.tag}-${log.msg}`" class="mb-1 break-all">
+              <span class="mr-2 select-none text-[var(--color-text-tertiary)]">[{{ formatLogTime(log.time) }}]</span>
+              <span class="mr-2 rounded px-1.5 py-0.5 text-[10px] font-bold" :class="getLogTagClass(log.tag)">{{ log.tag }}</span>
+              <span v-if="log.meta?.event" class="mr-2 rounded bg-[rgba(var(--theme-primary-rgb),0.1)] px-1.5 py-0.5 text-[10px] text-[var(--theme-primary)]">{{ getEventLabel(log.meta.event) }}</span>
+              <span :class="getLogMsgClass(log.tag)">{{ log.msg }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Today stats + bags -->
+        <div class="flex flex-col gap-4">
+          <section class="ds-card p-4">
+            <div class="mb-3 flex items-center gap-2 text-lg font-semibold">
+              <div class="i-carbon-chart-column text-[var(--theme-primary)]" />
+              今日统计
+            </div>
+            <EmptyState
+              v-if="!status?.connection?.connected"
+              icon="i-carbon-connection-signal-off"
+              title="账号未登录"
+              description="请先运行账号或检查网络连接"
+            />
+            <div v-else class="grid grid-cols-2 gap-2">
+              <div
+                v-for="(val, key) in filteredOperations"
+                :key="key"
+                class="flex items-center justify-between rounded-xl bg-[var(--color-bg-subtle)] px-3 py-2"
+              >
+                <div class="flex items-center gap-2">
+                  <div class="text-base" :class="[getOpIcon(key), getOpColor(key)]" />
+                  <div class="text-xs text-[var(--color-text-secondary)]">
+                    {{ getOpName(key) }}
+                  </div>
+                </div>
+                <div class="text-sm font-bold">
+                  {{ val }}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="ds-card p-4">
+            <div class="mb-3 flex items-center gap-2 text-lg font-semibold">
+              <div class="i-carbon-inventory-management text-[var(--theme-primary)]" />
+              关键物资
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="border border-[var(--color-border-default)] rounded-xl p-3">
+                <div class="text-xs text-[var(--color-text-tertiary)]">
+                  普通化肥
+                </div>
+                <div class="mt-1 text-lg font-bold">
+                  {{ fertilizerNormal?.count || 0 }}
+                </div>
+              </div>
+              <div class="border border-[var(--color-border-default)] rounded-xl p-3">
+                <div class="text-xs text-[var(--color-text-tertiary)]">
+                  有机化肥
+                </div>
+                <div class="mt-1 text-lg font-bold">
+                  {{ fertilizerOrganic?.count || 0 }}
+                </div>
+              </div>
+              <div class="border border-[var(--color-border-default)] rounded-xl p-3">
+                <div class="text-xs text-[var(--color-text-tertiary)]">
+                  普通收藏
+                </div>
+                <div class="mt-1 text-lg font-bold">
+                  {{ collectionNormal?.count || 0 }}
+                </div>
+              </div>
+              <div class="border border-[var(--color-border-default)] rounded-xl p-3">
+                <div class="text-xs text-[var(--color-text-tertiary)]">
+                  稀有收藏
+                </div>
+                <div class="mt-1 text-lg font-bold">
+                  {{ collectionRare?.count || 0 }}
+                </div>
+              </div>
+            </div>
+            <div v-if="fertilizerNormal || fertilizerOrganic" class="mt-3 text-xs text-[var(--color-text-tertiary)]">
+              普通桶 {{ formatBucketTime(fertilizerNormal) }} · 有机桶 {{ formatBucketTime(fertilizerOrganic) }}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   </div>

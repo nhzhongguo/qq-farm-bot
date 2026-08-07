@@ -230,6 +230,73 @@ test('task history is authenticated, owner-filtered, and rejects account overrid
     assert.equal(forbidden.status, 403);
 });
 
+test('interact records and account updates enforce owner isolation and sanitize payload', async () => {
+    await waitReady();
+    const aliceCard = userStore.createCard('sec alice access', 1, 'time');
+    const bobCard = userStore.createCard('sec bob access', 1, 'time');
+    assert.equal(userStore.registerUser('sec_alice', 'Alice123!', aliceCard.code).ok, true);
+    assert.equal(userStore.registerUser('sec_bob', 'Bob123!', bobCard.code).ok, true);
+    store.addOrUpdateAccount({ name: 'Sec Alice farm', username: 'sec_alice' });
+    store.addOrUpdateAccount({ name: 'Sec Bob farm', username: 'sec_bob' });
+    const aliceAccount = store.getAccountsByUser('sec_alice').accounts[0];
+    const bobAccount = store.getAccountsByUser('sec_bob').accounts[0];
+
+    const bobLogin = await request('POST', '/api/login', { body: { username: 'sec_bob', password: 'Bob123!' } });
+    const bobToken = bobLogin.json?.data?.token;
+    assert.equal(typeof bobToken, 'string');
+
+    const forbidden = await request('GET', '/api/interact-records', {
+        headers: { 'x-admin-token': bobToken, 'x-account-id': String(aliceAccount.id) },
+    });
+    assert.equal(forbidden.status, 403);
+
+    const updateRes = await request('POST', '/api/accounts', {
+        headers: { 'x-admin-token': bobToken },
+        body: {
+            id: bobAccount.id,
+            name: 'Bob renamed',
+            username: 'sec_alice',
+            code: 'ATTACK-CODE',
+            platform: 'qq',
+            loginType: 'manual',
+            isAdmin: true,
+            unexpected: 'drop-me',
+        },
+    });
+    assert.equal(updateRes.status, 200);
+    assert.equal(updateRes.json?.ok, true);
+
+    const updatedBob = store.getAccountsByUser('sec_bob').accounts[0];
+    const updatedAlice = store.getAccountsByUser('sec_alice').accounts[0];
+    assert.equal(updatedBob.name, 'Bob renamed');
+    assert.equal(updatedBob.username, 'sec_bob');
+    assert.equal(updatedBob.code, 'ATTACK-CODE');
+    assert.equal('unexpected' in updatedBob, false);
+    assert.equal('isAdmin' in updatedBob, false);
+    assert.equal(updatedAlice.id, aliceAccount.id);
+    assert.equal(updatedAlice.name, 'Sec Alice farm');
+});
+
+test('public rate limits ignore forged proxy headers by default', async () => {
+    await waitReady();
+    resetPublicRateLimits();
+
+    let blocked = null;
+    for (let i = 0; i < 15; i += 1) {
+        const res = await request('POST', '/api/register', {
+            headers: { 'x-forwarded-for': `203.0.113.${i}` },
+            body: { username: `forged${i}`, password: 'Abc123!', cardCode: 'NOPE' },
+        });
+        if (res.status === 429) {
+            blocked = res;
+            break;
+        }
+    }
+
+    assert.ok(blocked, 'expected forged proxy headers not to bypass IP rate limiting');
+    assert.equal(blocked.status, 429);
+});
+
 test('wechat QR login stays same-origin and reports an unavailable local service', async () => {
     await waitReady();
 

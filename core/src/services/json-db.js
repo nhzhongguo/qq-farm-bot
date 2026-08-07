@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const process = require('node:process');
+const metrics = require('./metrics');
 
 function ensureParentDir(filePath) {
     const dir = path.dirname(filePath);
@@ -20,6 +21,7 @@ function readTextFile(filePath, fallback = '') {
 
 function readJsonFile(filePath, fallbackFactory = () => ({})) {
     const fallback = typeof fallbackFactory === 'function' ? fallbackFactory() : (fallbackFactory || {});
+    const started = process.hrtime.bigint();
     try {
         if (!fs.existsSync(filePath)) return fallback;
         const raw = fs.readFileSync(filePath, 'utf8');
@@ -27,6 +29,9 @@ function readJsonFile(filePath, fallbackFactory = () => ({})) {
         return JSON.parse(raw);
     } catch {
         return fallback;
+    } finally {
+        const durationMs = Number(process.hrtime.bigint() - started) / 1e6;
+        metrics.recordPersistenceSample('read', filePath, durationMs, true);
     }
 }
 
@@ -38,6 +43,7 @@ function writeJsonFileAtomic(filePath, data, space = 2) {
 function writeTextFileAtomic(filePath, text = '') {
     ensureParentDir(filePath);
     const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    const started = process.hrtime.bigint();
 
     try {
         fs.writeFileSync(tmpPath, String(text), 'utf8');
@@ -48,6 +54,8 @@ function writeTextFileAtomic(filePath, text = '') {
         } catch {
             // ignore cleanup errors
         }
+        const durationMs = Number(process.hrtime.bigint() - started) / 1e6;
+        metrics.recordPersistenceSample('write', filePath, durationMs, true);
     }
 }
 

@@ -205,6 +205,11 @@ class MiniProgramLoginSession {
     }
 
     static async getAuthCode(ticket, appid = '1112386029') {
+        const result = await this.getAuthCodeResult(ticket, appid);
+        return result.code;
+    }
+
+    static async getAuthCodeResult(ticket, appid = '1112386029') {
         try {
             const response = await axios.post('https://q.qq.com/ide/login', {
                 appid,
@@ -213,7 +218,9 @@ class MiniProgramLoginSession {
                 headers: this.getHeaders()
             });
 
-            if (response.status !== 200) return '';
+            if (response.status !== 200) {
+                return { code: '', errorCode: `HTTP_${response.status}`, message: 'QQ 登录接口返回异常状态' };
+            }
 
             const data = response.data || {};
             // 兼容两种返回结构（与 GetLoginCode 同构的嵌套结构，或直接的 { code: '...' }）：
@@ -231,12 +238,16 @@ class MiniProgramLoginSession {
             const looksValid = rawCode.length >= 16 && rawCode.length <= 4096 && !/\s/.test(rawCode);
             if (!looksValid) {
                 console.error('[qrlogin] 换取农场 Code 无效响应:', JSON.stringify(data).slice(0, 300));
-                return '';
+                return {
+                    code: '',
+                    errorCode: String(data.code || nested.code || '').trim(),
+                    message: String(data.message || data.msg || 'QQ 官方未返回有效的农场登录 Code').trim(),
+                };
             }
-            return rawCode;
+            return { code: rawCode, errorCode: '', message: '' };
         } catch (error) {
             console.error('MP Get Auth Code Error:', error.message);
-            return '';
+            return { code: '', errorCode: 'NETWORK_ERROR', message: 'QQ 登录接口请求失败' };
         }
     }
 }

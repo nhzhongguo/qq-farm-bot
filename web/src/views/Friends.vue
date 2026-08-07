@@ -9,6 +9,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 import { useAccountStore } from '@/stores/account'
 import { useFriendStore } from '@/stores/friend'
 import { useStatusStore } from '@/stores/status'
@@ -111,6 +112,8 @@ const newKnownFriendGid = ref('')
 const localKnownFriendGidSyncCooldownSec = ref(300)
 const showBatchAddGidModal = ref(false)
 const batchGidInput = ref('')
+const { setContainer: batchAddGidModalSetContainer } = useFocusTrap(showBatchAddGidModal)
+const { setContainer: gidListModalSetContainer } = useFocusTrap(showGidListModal)
 
 const interactFilter = ref('all')
 const interactFilters = [
@@ -812,6 +815,7 @@ async function handleBatchAddKnownFriendGids() {
                   <img
                     v-if="canShowFriendAvatar(friend)"
                     :src="getFriendAvatar(friend)"
+                    :alt="friend.name || `GID:${friend.gid}`"
                     class="h-full w-full object-cover"
                     loading="lazy"
                     @error="handleFriendAvatarError(friend)"
@@ -977,6 +981,7 @@ async function handleBatchAddKnownFriendGids() {
                 <img
                   v-if="item.avatarUrl"
                   :src="item.avatarUrl"
+                  :alt="item.name || `GID:${item.gid}`"
                   class="h-full w-full object-cover"
                   loading="lazy"
                   @error="($event.target as HTMLImageElement).style.display = 'none'"
@@ -1062,6 +1067,7 @@ async function handleBatchAddKnownFriendGids() {
               <img
                 v-if="canShowInteractAvatar(record)"
                 :src="getInteractAvatar(record)"
+                :alt="record.nick || `GID:${record.visitorGid}`"
                 class="h-full w-full object-cover"
                 loading="lazy"
                 @error="handleInteractAvatarError(record)"
@@ -1114,11 +1120,16 @@ async function handleBatchAddKnownFriendGids() {
     <Teleport to="body">
       <div
         v-if="showBatchAddGidModal"
+        :ref="batchAddGidModalSetContainer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="batch-gid-title"
         class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm"
         @click.self="showBatchAddGidModal = false"
+        @keydown.esc="showBatchAddGidModal = false"
       >
         <div class="ds-surface-solid max-w-lg w-full p-6 shadow-lg">
-          <h3 class="mb-2 text-lg text-[var(--color-text-primary)] font-semibold">
+          <h3 id="batch-gid-title" class="mb-2 text-lg text-[var(--color-text-primary)] font-semibold">
             批量新增 GID
           </h3>
           <p class="mb-3 text-sm text-[var(--color-text-secondary)]">
@@ -1148,13 +1159,18 @@ async function handleBatchAddKnownFriendGids() {
 
       <div
         v-if="showGidListModal"
+        :ref="gidListModalSetContainer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gid-list-title"
         class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm"
         @click.self="showGidListModal = false"
+        @keydown.esc="showGidListModal = false"
       >
         <div class="ds-surface-solid max-h-[80vh] max-w-2xl w-full flex flex-col overflow-hidden shadow-lg">
           <div class="flex shrink-0 items-center justify-between border-b border-[var(--color-border-default)] p-4">
             <div>
-              <h3 class="text-lg text-[var(--color-text-primary)] font-semibold">
+              <h3 id="gid-list-title" class="text-lg text-[var(--color-text-primary)] font-semibold">
                 已导入的 GID 列表
               </h3>
               <p class="mt-1 text-sm text-[var(--color-text-secondary)]">
@@ -1165,6 +1181,7 @@ async function handleBatchAddKnownFriendGids() {
             </div>
             <button
               class="rounded-lg p-2 text-[var(--color-text-tertiary)] transition hover:bg-[var(--color-bg-subtle)]"
+              aria-label="关闭 GID 列表"
               @click="showGidListModal = false"
             >
               <div class="i-carbon-close text-xl" />
@@ -1226,6 +1243,7 @@ async function handleBatchAddKnownFriendGids() {
                 <button
                   class="rounded-lg p-1.5 text-[var(--color-text-tertiary)] transition hover:bg-[var(--color-bg-surface)] hover:text-[var(--color-danger)]"
                   :disabled="knownFriendSettingsSaving"
+                  :aria-label="`从名单移除 GID ${item.gid}`"
                   @click="handleRemoveGidFromList(item.gid)"
                 >
                   <div class="i-carbon-trash-can text-sm" />

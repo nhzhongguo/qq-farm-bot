@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { useIntervalFn } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 import { useAccountStore } from '@/stores/account'
 import { useWxLoginStore } from '@/stores/wx-login'
 
 const props = defineProps<{
   show: boolean
 }>()
-
 const emit = defineEmits(['close', 'saved'])
+
+const { setContainer } = useFocusTrap(toRef(props, 'show'))
 
 const wxLoginStore = useWxLoginStore()
 const accountStore = useAccountStore()
@@ -113,16 +115,18 @@ watch(() => props.show, (newVal) => {
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+  <div v-if="show" :ref="setContainer" role="dialog" aria-modal="true" aria-labelledby="wx-login-title" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
     <div class="max-w-md w-full overflow-hidden rounded-lg shadow-xl" :style="{ background: 'var(--theme-bg)' }">
       <!-- Header -->
       <div class="flex items-center justify-between border-b p-4" :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 10%, transparent)' }">
-        <h3 class="text-lg font-semibold" :style="{ color: 'var(--theme-text)' }">
+        <h3 id="wx-login-title" class="text-lg font-semibold" :style="{ color: 'var(--theme-text)' }">
           微信扫码登录
         </h3>
         <BaseButton variant="ghost" class="!p-1" @click="close">
-          <div class="i-carbon-close text-xl" :style="{ color: 'var(--theme-text)' }" />
-        </BaseButton>
+          <BaseButton variant="ghost" class="!p-1" aria-label="关闭" @click="close">
+            <div class="i-carbon-close text-xl" :style="{ color: 'var(--theme-text)' }" />
+          </BaseButton>
+        </basebutton>
       </div>
 
       <!-- Login Content -->
@@ -142,6 +146,7 @@ watch(() => props.show, (newVal) => {
             :style="{ borderColor: 'color-mix(in srgb, var(--theme-text) 20%, transparent)', background: 'var(--color-bg-surface)' }"
           >
             <img :src="qrImageSrc" class="h-48 w-48">
+            <img :src="qrImageSrc" alt="微信登录二维码" class="h-48 w-48">
           </div>
           <div
             v-else

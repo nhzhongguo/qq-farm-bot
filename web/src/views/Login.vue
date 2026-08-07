@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 import { useUserStore } from '@/stores/user'
 
 declare const __APP_VERSION__: string
@@ -25,6 +26,7 @@ const rateLimitRemaining = ref(0)
 const cardClaimEnabled = ref(false)
 const cardClaimLoading = ref(false)
 const showClaimModal = ref(false)
+const { setContainer: claimModalSetContainer } = useFocusTrap(showClaimModal)
 const claimModalContent = ref({
   success: true,
   title: '',
@@ -417,7 +419,7 @@ onMounted(() => {
       </section>
     </div>
 
-    <div v-if="showClaimModal" class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm" @click="closeClaimModal">
+    <div v-if="showClaimModal" :ref="claimModalSetContainer" role="dialog" aria-modal="true" aria-label="卡密领取结果" class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm" @click="closeClaimModal">
       <div class="ds-surface-solid max-w-sm w-full p-6" @click.stop>
         <div class="mb-3 text-lg font-bold" :class="claimModalContent.success ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'">
           {{ claimModalContent.title }}

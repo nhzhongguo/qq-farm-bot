@@ -52,6 +52,37 @@
   --color-chart-green: #22c55e;
   --color-chart-blue: #3b82f6;
   --color-chart-red: #e11d48;
+  --color-chart-cb-1: #1f77b4;
+  --color-chart-cb-2: #ff7f0e;
+  --color-chart-cb-3: #2ca02c;
+  --color-chart-cb-4: #d62728;
+  --color-chart-cb-5: #9467bd;
+
+  /* Farm palette (light) */
+  --color-farm-soil: #9a6a3c;
+  --color-farm-soil-deep: #7c5230;
+  --color-farm-grass: #5aa84e;
+  --color-farm-leaf: #3d9440;
+  --color-farm-ripe: #f0b429;
+  --color-farm-ripe-deep: #d98e04;
+  --color-farm-water: #4aa8e0;
+  --color-farm-sky: #e8f4fb;
+  --color-farm-soil-soft: rgba(154, 106, 60, 0.14);
+  --color-farm-grass-soft: rgba(90, 168, 78, 0.14);
+  --color-farm-ripe-soft: rgba(240, 180, 41, 0.16);
+  --color-farm-water-soft: rgba(74, 168, 224, 0.14);
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
   /* Legacy aliases used across the app */
   --theme-bg: var(--color-bg-app);
   --theme-text: var(--color-text-primary);
@@ -85,8 +116,13 @@
   --page-pad: 1.25rem;
   --z-header: 30;
   --z-sidebar: 50;
+  --z-dropdown: 40;
+  --z-popover: 55;
   --z-modal: 60;
   --z-toast: 70;
+
+  /* Chart series order used by SVG charts */
+  --chart-series: var(--color-chart-blue), var(--color-chart-gold), var(--color-chart-green), var(--color-chart-purple), var(--color-chart-red);
 }
 
 .dark {
@@ -111,7 +147,25 @@
   --color-chart-green: #4ade80;
   --color-chart-blue: #60a5fa;
   --color-chart-red: #fb7185;
+  --color-chart-cb-1: #6baed6;
+  --color-chart-cb-2: #fdae6b;
+  --color-chart-cb-3: #74c476;
+  --color-chart-cb-4: #fb6a4a;
+  --color-chart-cb-5: #beaed4;
 
+  /* Farm palette (dark) */
+  --color-farm-soil: #7c5230;
+  --color-farm-soil-deep: #5f3f24;
+  --color-farm-grass: #3d9440;
+  --color-farm-leaf: #2f7a33;
+  --color-farm-ripe: #f0b429;
+  --color-farm-ripe-deep: #d98e04;
+  --color-farm-water: #3d8fc0;
+  --color-farm-sky: #10202a;
+  --color-farm-soil-soft: rgba(124, 82, 48, 0.28);
+  --color-farm-grass-soft: rgba(61, 148, 64, 0.26);
+  --color-farm-ripe-soft: rgba(240, 180, 41, 0.24);
+  --color-farm-water-soft: rgba(61, 143, 192, 0.26);
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.28);
@@ -328,6 +382,45 @@ body {
 .slide-fade-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+/* Listbox dropdown panel */
+.ds-listbox-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: var(--z-dropdown);
+  margin-top: 0.25rem;
+  max-height: 15rem;
+  overflow: auto;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  padding: 0.25rem 0;
+  box-shadow: var(--shadow-md);
+}
+
+.ds-option {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.ds-option:hover,
+.ds-option:focus-visible,
+.ds-option[data-active='true'] {
+  outline: none;
+  background: var(--color-bg-subtle);
+}
+
+.ds-option[aria-selected='true'] {
+  background: rgba(var(--theme-primary-rgb), 0.12);
+  color: var(--theme-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {

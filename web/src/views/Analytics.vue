@@ -30,6 +30,11 @@ const activeTab = ref('crops')
 
 const strategyLevel = ref(1)
 
+// 策略对比相关状态
+const strategyCompareLoading = ref(false)
+const strategyCompareData = ref<any>(null)
+const strategyCompareError = ref('')
+
 watch(() => status.value?.status?.level, (newLevel) => {
   if (newLevel && Number(newLevel) > 0) {
     strategyLevel.value = Number(newLevel)
@@ -237,6 +242,31 @@ async function loadAnalytics() {
   }
 }
 
+async function loadStrategyCompare() {
+  if (!currentAccountId.value)
+    return
+  strategyCompareLoading.value = true
+  strategyCompareError.value = ''
+  try {
+    const res = await api.get('/api/analytics/strategy-compare', {
+      params: { days: 7 },
+      headers: { 'x-account-id': currentAccountId.value },
+    })
+    if (res.data?.ok && res.data.data) {
+      strategyCompareData.value = res.data.data
+    }
+    else {
+      strategyCompareError.value = res.data?.error || '策略对比加载失败'
+    }
+  }
+  catch (error: any) {
+    strategyCompareError.value = error?.response?.data?.error || error?.message || '无法加载策略对比'
+  }
+  finally {
+    strategyCompareLoading.value = false
+  }
+}
+
 async function handleToggleBlacklist(item: any) {
   await plantBlacklistStore.toggleBlacklist(item.seedId)
   if (plantBlacklistStore.isBlacklisted(item.seedId)) {
@@ -282,6 +312,12 @@ onMounted(() => {
 watch([currentAccountId, sortKey], () => {
   loadError.value = ''
   loadAnalytics()
+})
+
+watch(currentAccountId, () => {
+  if (currentAccountId.value) {
+    loadStrategyCompare()
+  }
 })
 
 function formatLv(level: any) {

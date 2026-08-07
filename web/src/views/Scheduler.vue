@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import api from '@/api'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
+import { cachedGet } from '@/utils/request'
 
 interface SchedulerTask {
   name: string
@@ -154,11 +154,11 @@ function formatNextRun(task: SchedulerTask) {
 async function loadScheduler() {
   loading.value = true
   const [schedulerResult, historyResult] = await Promise.allSettled([
-    api.get('/api/scheduler'),
-    api.get('/api/task-runs', { params: { limit: 50 } }),
+    cachedGet<any>('/api/scheduler', undefined, { ttl: 12000 }),
+    cachedGet<any>('/api/task-runs', { limit: 50 }, { ttl: 12000 }),
   ])
   if (schedulerResult.status === 'fulfilled') {
-    const data = schedulerResult.value.data?.data || {}
+    const data = schedulerResult.value || {}
     runtime.value = data.runtime || null
     worker.value = data.worker || null
     workerError.value = String(data.workerError || '')
@@ -169,7 +169,7 @@ async function loadScheduler() {
     workerError.value = '暂时无法读取调度状态'
   }
   if (historyResult.status === 'fulfilled') {
-    const runs = historyResult.value.data?.data?.runs
+    const runs = historyResult.value?.runs
     taskRuns.value = Array.isArray(runs) ? runs : []
     historyError.value = ''
   }
@@ -185,14 +185,35 @@ watch(currentAccountId, () => {
   loadScheduler()
 })
 
+function stopPolling() {
+  if (refreshTimer) {
+    window.clearInterval(refreshTimer)
+    refreshTimer = undefined
+  }
+}
+
 onMounted(() => {
   loadScheduler()
-  refreshTimer = window.setInterval(loadScheduler, 15000)
+  if (!document.hidden)
+    refreshTimer = window.setInterval(loadScheduler, 15000)
 })
 
+function handleVisibilityChange() {
+  if (document.hidden) {
+    stopPolling()
+  }
+  else {
+    loadScheduler()
+    if (!refreshTimer)
+      refreshTimer = window.setInterval(loadScheduler, 15000)
+  }
+}
+
+document.addEventListener('visibilitychange', handleVisibilityChange)
+
 onUnmounted(() => {
-  if (refreshTimer)
-    window.clearInterval(refreshTimer)
+  stopPolling()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 

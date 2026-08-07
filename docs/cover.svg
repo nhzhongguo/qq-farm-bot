@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b2417"/>
+      <stop offset="0.55" stop-color="#123a24"/>
+      <stop offset="1" stop-color="#174a2c"/>
+    </linearGradient>
+    <linearGradient id="ridge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b8a52"/>
+      <stop offset="1" stop-color="#2c7343"/>
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#f2b84b" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#f2b84b" stop-opacity="0"/>
+    </radialGradient>
+    <g id="seedling">
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#1e5a33" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M0 3 C -5 2 -9 4 -11 8 C -6 8 -2 7 0 3 Z" fill="#8fd66b"/>
+      <path d="M0 5 C 5 4 9 6 11 10 C 6 10 2 9 0 5 Z" fill="#6cc04f"/>
+    </g>
+    <g id="tallSeedling">
+      <line x1="0" y1="0" x2="0" y2="16" stroke="#1e5a33" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M0 4 C -6 2 -11 5 -14 10 C -8 9 -3 8 0 4 Z" fill="#8fd66b"/>
+      <path d="M0 7 C 6 5 11 8 14 13 C 8 12 3 11 0 7 Z" fill="#6cc04f"/>
+      <ellipse cx="0" cy="15" rx="3" ry="3.6" fill="#f2b84b"/>
+    </g>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <circle cx="1150" cy="110" r="150" fill="url(#sunGlow)"/>
+  <circle cx="150" cy="560" r="120" fill="#ffffff" opacity="0.03"/>
+  <circle cx="420" cy="120" r="3" fill="#f2b84b" opacity="0.55"/>
+  <circle cx="540" cy="180" r="2" fill="#9adf8a" opacity="0.45"/>
+  <circle cx="330" cy="90" r="2" fill="#9adf8a" opacity="0.35"/>
+  <circle cx="1220" cy="330" r="2.5" fill="#f2b84b" opacity="0.4"/>
+  <circle cx="1120" cy="520" r="2" fill="#9adf8a" opacity="0.3"/>
+
+  <!-- 左侧：Logo + 标题 + 标签 -->
+  <g font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+    <g transform="translate(88,96)">
+      <rect width="56" height="56" rx="14" fill="#f2b84b"/>
+      <g transform="translate(28,40)">
+        <line x1="0" y1="0" x2="0" y2="10" stroke="#123a24" stroke-width="4" stroke-linecap="round"/>
+        <path d="M0 4 C -8 2 -14 6 -18 12 C -9 11 -4 9 0 4 Z" fill="#174a2c"/>
+        <path d="M0 7 C 8 5 14 9 18 15 C 9 14 4 12 0 7 Z" fill="#174a2c"/>
+      </g>
+      <text x="28" y="86" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="3" fill="#d9ead9" opacity="0.9">QQ FARM</text>
+    </g>
+
+    <text x="88" y="240" font-size="76" font-weight="800" fill="#f7f3e9" letter-spacing="1">QQ Farm Bot</text>
+    <text x="90" y="296" font-size="30" font-weight="500" fill="#bcd9c4">多账号 QQ 农场自动化托管平台</text>
+
+    <g transform="translate(88,360)">
+      <g transform="translate(0,0)">
+        <rect width="208" height="58" rx="16" fill="#ffffff" opacity="0.1"/>
+        <rect width="208" height="58" rx="16" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="1.5"/>
+        <circle cx="30" cy="29" r="9" fill="#8fd66b"/>
+        <circle cx="46" cy="29" r="9" fill="#6cc04f"/>
+        <circle cx="62" cy="29" r="9" fill="#4e9e4f"/>
+        <text x="84" y="36" font-size="21" font-weight="600" fill="#f7f3e9">多账号托管</text>
+      </g>
+      <g transform="translate(236,0)">
+        <rect width="176" height="58" rx="16" fill="#ffffff" opacity="0.1"/>
+        <rect width="176" height="58" rx="16" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="1.5"/>
+        <path d="M30 20 h8 a8 8 0 0 1 8 8 v4 h-24 v-4 a8 8 0 0 1 8 -8 Z" fill="#f2b84b"/>
+        <circle cx="34" cy="40" r="3" fill="#f2b84b"/>
+        <text x="60" y="36" font-size="21" font-weight="600" fill="#f7f3e9">实时告警</text>
+      </g>
+      <g transform="translate(440,0)">
+        <rect width="176" height="58" rx="16" fill="#ffffff" opacity="0.1"/>
+        <rect width="176" height="58" rx="16" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="1.5"/>
+        <path d="M22 34 a12 12 0 1 1 12 12" fill="none" stroke="#9adf8a" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M34 46 l-3 -9 9 3 Z" fill="#9adf8a"/>
+        <text x="60" y="36" font-size="21" font-weight="600" fill="#f7f3e9">自动运营</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- 右侧：运营面板 -->
+  <g transform="translate(712,96)">
+    <rect width="372" height="252" rx="18" fill="#f7f3e9"/>
+    <rect width="372" height="252" rx="18" fill="none" stroke="#ffffff" stroke-opacity="0.25" stroke-width="1.5"/>
+    <g transform="translate(22,22)">
+      <circle cx="7" cy="7" r="5" fill="#e26d5c"/>
+      <circle cx="25" cy="7" r="5" fill="#f2b84b"/>
+      <circle cx="43" cy="7" r="5" fill="#6cc04f"/>
+      <text x="70" y="13" font-family="'Segoe UI','Microsoft YaHei',sans-serif" font-size="15" font-weight="700" fill="#123a24">运营面板</text>
+      <rect x="268" y="-1" width="82" height="26" rx="13" fill="#e2f3e4"/>
+      <circle cx="282" cy="12" r="4" fill="#3b8a52"/>
+      <text x="293" y="17" font-family="'Segoe UI','Microsoft YaHei',sans-serif" font-size="13" font-weight="600" fill="#1e5a33">自动运营中</text>
+    </g>
+    <g transform="translate(22,64)">
+      <line x1="0" y1="146" x2="328" y2="146" stroke="#e4e0d2" stroke-width="1.5"/>
+      <line x1="0" y1="110" x2="328" y2="110" stroke="#efece1" stroke-width="1"/>
+      <line x1="0" y1="73" x2="328" y2="73" stroke="#efece1" stroke-width="1"/>
+      <line x1="0" y1="36" x2="328" y2="36" stroke="#efece1" stroke-width="1"/>
+      <polyline points="0,130 40,118 80,122 120,96 160,104 200,70 240,80 280,52 328,58"
+        fill="none" stroke="#3b8a52" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="120" cy="96" r="6" fill="#f2b84b" stroke="#f7f3e9" stroke-width="2.5"/>
+      <circle cx="280" cy="52" r="6" fill="#3b8a52" stroke="#f7f3e9" stroke-width="2.5"/>
+      <text x="0" y="172" font-family="'Segoe UI','Microsoft YaHei',sans-serif" font-size="13" fill="#5c6f5e">昨日收益</text>
+      <text x="328" y="172" text-anchor="end" font-family="'Segoe UI',sans-serif" font-size="14" font-weight="700" fill="#123a24">+36,840</text>
+    </g>
+  </g>
+
+  <!-- 右侧：太阳 -->
+  <circle cx="1150" cy="108" r="46" fill="#f2b84b"/>
+  <g stroke="#f7f3e9" stroke-width="4" stroke-linecap="round">
+    <line x1="1150" y1="42" x2="1150" y2="56"/>
+    <line x1="1150" y1="160" x2="1150" y2="174"/>
+    <line x1="1084" y1="108" x2="1098" y2="108"/>
+    <line x1="1202" y1="108" x2="1216" y2="108"/>
+    <line x1="1103" y1="61" x2="1113" y2="71"/>
+    <line x1="1187" y1="145" x2="1197" y2="155"/>
+    <line x1="1197" y1="61" x2="1187" y2="71"/>
+    <line x1="1113" y1="145" x2="1103" y2="155"/>
+  </g>
+
+  <!-- 右侧：农田（俯视规整田垄） -->
+  <g transform="translate(760,404)">
+    <rect width="424" height="188" rx="16" fill="#1a4a2c"/>
+    <rect width="424" height="188" rx="16" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="1.5"/>
+    <g>
+      <rect x="20" y="16" width="384" height="30" rx="6" fill="url(#ridge)"/>
+      <rect x="20" y="52" width="384" height="9" rx="4" fill="#0f2b1a"/>
+      <rect x="20" y="67" width="384" height="30" rx="6" fill="url(#ridge)"/>
+      <rect x="20" y="103" width="384" height="9" rx="4" fill="#0f2b1a"/>
+      <rect x="20" y="118" width="384" height="30" rx="6" fill="url(#ridge)"/>
+      <rect x="20" y="154" width="384" height="9" rx="4" fill="#0f2b1a"/>
+      <rect x="20" y="169" width="384" height="4" rx="2" fill="#3b8a52"/>
+    </g>
+    <g>
+      <use href="#seedling" transform="translate(56,24)"/>
+      <use href="#seedling" transform="translate(128,24)"/>
+      <use href="#seedling" transform="translate(200,24)"/>
+      <use href="#seedling" transform="translate(272,24)"/>
+      <use href="#seedling" transform="translate(344,24)"/>
+      <use href="#tallSeedling" transform="translate(80,74)"/>
+      <use href="#tallSeedling" transform="translate(152,74)"/>
+      <use href="#seedling" transform="translate(224,74)"/>
+      <use href="#tallSeedling" transform="translate(296,74)"/>
+      <use href="#seedling" transform="translate(368,74)"/>
+      <use href="#seedling" transform="translate(56,124)"/>
+      <use href="#seedling" transform="translate(128,124)"/>
+      <use href="#tallSeedling" transform="translate(200,124)"/>
+      <use href="#seedling" transform="translate(272,124)"/>
+      <use href="#seedling" transform="translate(344,124)"/>
+    </g>
+  </g>
+
+  <!-- 左下角版本信息 -->
+  <text x="88" y="590" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif" font-size="15" font-weight="500" fill="#8fb8a0" letter-spacing="1">SELF-HOSTED · 账号级队列 · 指数退避 · 数据隔离</text>
+</svg>

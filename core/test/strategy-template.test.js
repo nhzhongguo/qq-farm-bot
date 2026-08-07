@@ -118,6 +118,34 @@ test('deleteTemplate returns false for non-existent id', () => {
     assert.ok(!tmpl.deleteTemplate('non-existent'));
 });
 
+test('template owner isolation prevents cross-user overwrite and access', () => {
+    const alice = tmpl.saveTemplate('同名作物', 'alice copy', sampleConfig, 'alice');
+    const bob = tmpl.saveTemplate('同名作物', 'bob copy', { ...sampleConfig, strategy: 'level' }, 'bob');
+
+    assert.equal(alice.id === bob.id, false);
+    assert.equal(alice.config.strategy, 'bag_priority');
+    assert.equal(bob.config.strategy, 'level');
+
+    const aliceList = tmpl.listTemplates('alice').filter(t => t.name === '同名作物');
+    const bobList = tmpl.listTemplates('bob').filter(t => t.name === '同名作物');
+    assert.equal(aliceList.length, 1);
+    assert.equal(bobList.length, 1);
+    assert.equal(aliceList[0].id, alice.id);
+    assert.equal(bobList[0].id, bob.id);
+
+    assert.equal(tmpl.getTemplate(alice.id, 'bob'), null);
+    assert.equal(tmpl.getTemplate(bob.id, 'alice'), null);
+    assert.equal(tmpl.deleteTemplate(alice.id, 'bob'), false);
+    assert.ok(tmpl.getTemplate(alice.id, 'alice'));
+    assert.equal(tmpl.deleteTemplate(alice.id, 'alice'), true);
+});
+
+test('legacy templates without owner remain visible to every user', () => {
+    const legacy = tmpl.saveTemplate('公共旧模板', '', sampleConfig);
+    assert.ok(tmpl.getTemplate(legacy.id, 'alice'));
+    assert.ok(tmpl.getTemplate(legacy.id, 'bob'));
+});
+
 test('saveTemplate throws for empty name', () => {
     assert.throws(() => tmpl.saveTemplate('', '', sampleConfig), /名称/);
 });

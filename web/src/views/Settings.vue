@@ -13,6 +13,7 @@ import BaseSkeleton from '@/components/ui/BaseSkeleton.vue'
 import BaseSwitch from '@/components/ui/BaseSwitch.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 import { getPlatformClass, getPlatformLabel, useAccountStore } from '@/stores/account'
 import { useFarmStore } from '@/stores/farm'
 import { useSettingStore } from '@/stores/setting'
@@ -568,6 +569,7 @@ async function saveStrategySettings() {
 
 // ==================== 配置导入/导出/模板 ====================
 const showTemplateModal = ref(false)
+const { setContainer: templateModalSetContainer } = useFocusTrap(showTemplateModal)
 const templates = ref<any[]>([])
 const templateLoading = ref(false)
 const newTemplateName = ref('')
@@ -1543,6 +1545,7 @@ async function handleTestOffline() {
                     <button
                       class="rounded p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700"
                       :disabled="index === 0"
+                      aria-label="上移该种子"
                       @click="moveBagSeed(seed.seedId, -1)"
                     >
                       <div class="i-carbon-arrow-up text-sm" />
@@ -1550,6 +1553,7 @@ async function handleTestOffline() {
                     <button
                       class="rounded p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700"
                       :disabled="index === sortedBagSeeds.length - 1"
+                      aria-label="下移该种子"
                       @click="moveBagSeed(seed.seedId, 1)"
                     >
                       <div class="i-carbon-arrow-down text-sm" />
@@ -1997,13 +2001,13 @@ async function handleTestOffline() {
     />
 
     <!-- 模板管理弹窗 -->
-    <div v-if="showTemplateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showTemplateModal = false">
+    <div v-if="showTemplateModal" :ref="templateModalSetContainer" role="dialog" aria-modal="true" aria-labelledby="template-modal-title" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showTemplateModal = false">
       <div class="ds-surface max-h-[80vh] max-w-2xl w-full overflow-y-auto p-6">
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-lg font-bold">
+          <h3 id="template-modal-title" class="text-lg font-bold">
             策略模板管理
           </h3>
-          <button class="text-gray-400 hover:text-gray-600" @click="showTemplateModal = false">
+          <button class="text-gray-400 hover:text-gray-600" aria-label="关闭" @click="showTemplateModal = false">
             <div class="i-carbon-close text-xl" />
           </button>
         </div>

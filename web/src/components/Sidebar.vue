@@ -7,6 +7,7 @@ import api from '@/api'
 import AccountModal from '@/components/AccountModal.vue'
 import RemarkModal from '@/components/RemarkModal.vue'
 import LiveClock from '@/components/ui/LiveClock.vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 
 import { menuRoutes } from '@/router/menu'
 import { getPlatformClass, getPlatformLabel, useAccountStore } from '@/stores/account'
@@ -234,6 +235,10 @@ const announcementShowOnce = ref(true)
 const announcementSaving = ref(false)
 const announcementLoading = ref(false)
 const currentAnnouncement = ref<{ content: string, showOnce: boolean, updatedAt: number, shouldShow?: boolean } | null>(null)
+const { setContainer: renewModalSetContainer } = useFocusTrap(showRenewModal)
+const { setContainer: announcementModalSetContainer } = useFocusTrap(showAnnouncementModal)
+const announcementViewActive = computed(() => showAnnouncementViewModal.value && !!currentAnnouncement.value?.content)
+const { setContainer: announcementViewModalSetContainer } = useFocusTrap(announcementViewActive)
 const showThemeDropdown = ref(false)
 const showTokenDropdown = ref(false)
 const tokenVisible = ref(false)
@@ -419,6 +424,7 @@ async function copyToken() {
       <!-- Mobile Close Button -->
       <button
         class="rounded-lg p-1 text-gray-500 lg:hidden hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+        aria-label="关闭侧边栏"
         @click="appStore.closeSidebar"
       >
         <div class="i-carbon-close text-xl" />
@@ -437,6 +443,7 @@ async function copyToken() {
             <div class="h-8 w-8 flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200 ring-2 ring-white dark:bg-gray-600 dark:ring-gray-700">
               <img
                 :src="userStore.avatar || 'https://free.picui.cn/free/2026/03/10/69affe5755149.jpg'"
+                alt=""
                 class="h-full w-full object-cover"
                 @error="(e) => (e.target as HTMLImageElement).src = 'https://free.picui.cn/free/2026/03/10/69affe5755149.jpg'"
               >
@@ -532,6 +539,7 @@ async function copyToken() {
               <img
                 v-if="currentAccount?.uin"
                 :src="`https://q1.qlogo.cn/g?b=qq&nk=${currentAccount.uin}&s=100`"
+                alt=""
                 class="h-full w-full object-cover"
                 @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
               >
@@ -580,6 +588,7 @@ async function copyToken() {
                   <img
                     v-if="acc.uin"
                     :src="`https://q1.qlogo.cn/g?b=qq&nk=${acc.uin}&s=100`"
+                    alt=""
                     class="h-full w-full object-cover"
                     @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
                   >
@@ -604,6 +613,7 @@ async function copyToken() {
                   <button
                     class="rounded-full p-1 text-gray-400 transition-colors hover:bg-blue-50/50 hover:text-blue-500 dark:hover:bg-blue-900/20"
                     title="修改备注"
+                    aria-label="修改备注"
                     @click.stop="openRemarkModal(acc)"
                   >
                     <div class="i-carbon-edit" />
@@ -723,6 +733,7 @@ async function copyToken() {
           <button
             class="flex items-center gap-1 rounded px-2 py-1 text-gray-400 transition-colors hover:bg-gray-200/50 hover:text-gray-600 dark:hover:bg-gray-700/50 dark:hover:text-gray-300"
             title="主题设置"
+            aria-label="主题设置"
             @click="showThemeDropdown = !showThemeDropdown"
           >
             <div class="i-carbon-color-palette text-sm" :style="{ color: 'var(--theme-primary)' }" />
@@ -802,11 +813,15 @@ async function copyToken() {
   <!-- 续费卡密弹窗 -->
   <div
     v-if="showRenewModal"
+    :ref="renewModalSetContainer"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="renew-modal-title"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
     @click.self="showRenewModal = false"
   >
     <div class="w-96 rounded-xl bg-white p-5 shadow-2xl dark:bg-gray-800" @click.stop>
-      <h3 class="mb-4 text-lg text-gray-900 font-bold dark:text-gray-100">
+      <h3 id="renew-modal-title" class="mb-4 text-lg text-gray-900 font-bold dark:text-gray-100">
         续费卡密
       </h3>
 
@@ -933,11 +948,15 @@ async function copyToken() {
   <!-- 管理员设置公告弹窗 -->
   <div
     v-if="showAnnouncementModal"
+    :ref="announcementModalSetContainer"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="announcement-modal-title"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
     @click.self="showAnnouncementModal = false"
   >
     <div class="w-[500px] rounded-xl bg-white p-5 shadow-2xl dark:bg-gray-800" @click.stop>
-      <h3 class="mb-4 text-lg text-gray-900 font-bold dark:text-gray-100">
+      <h3 id="announcement-modal-title" class="mb-4 text-lg text-gray-900 font-bold dark:text-gray-100">
         设置公告
       </h3>
 
@@ -994,6 +1013,10 @@ async function copyToken() {
   <!-- 普通用户查看公告弹窗 -->
   <div
     v-if="showAnnouncementViewModal && currentAnnouncement?.content"
+    :ref="announcementViewModalSetContainer"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="announcement-view-title"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
   >
     <div
@@ -1003,7 +1026,7 @@ async function copyToken() {
       <div class="p-5">
         <div class="mb-4 flex items-center gap-2">
           <div class="i-carbon-notification text-xl" :style="{ color: 'var(--theme-primary)' }" />
-          <h3 class="text-lg text-gray-900 font-bold dark:text-gray-100">
+          <h3 id="announcement-view-title" class="text-lg text-gray-900 font-bold dark:text-gray-100">
             系统公告
           </h3>
         </div>

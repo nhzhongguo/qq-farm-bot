@@ -27,6 +27,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use((response) => {
   return response
 }, (error) => {
+  // 路由切换主动取消的请求：静默处理，不弹错误提示
+  if (axios.isCancel(error) || error?.code === 'ERR_CANCELED') {
+    return Promise.reject(error)
+  }
+
   const toast = useToastStore()
 
   if (error.response) {

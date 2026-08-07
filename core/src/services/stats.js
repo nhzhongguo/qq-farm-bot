@@ -153,11 +153,23 @@ function recordOperation(type, count = 1) {
     }
 }
 
+function buildStatsSnapshot(dateKey = getTodayKey()) {
+    return {
+        date: dateKey,
+        operations: { ...operations },
+        initialState: { ...initialState },
+        gold: lastState.gold >= 0 ? lastState.gold : null,
+        exp: lastState.exp >= 0 ? lastState.exp : null,
+        savedAt: Date.now(),
+    };
+}
+
 function checkAndResetDailyStats() {
     if (!currentAccountId) return;
     const todayKey = getTodayKey();
     if (currentDateKey && currentDateKey !== todayKey) {
-        console.warn(`[统计] 检测到跨天，重置每日统计 (${currentDateKey} -> ${todayKey})`);
+        console.warn(`[统计] 检测到跨天，归档昨日统计 (${currentDateKey} -> ${todayKey})`);
+        archiveDailySnapshot(currentAccountId, buildStatsSnapshot(currentDateKey));
         Object.keys(operations).forEach((key) => {
             operations[key] = 0;
         });
@@ -176,15 +188,7 @@ function scheduleSave() {
 
 function doSave() {
     if (!currentAccountId) return;
-    const todayKey = getTodayKey();
-    const data = {
-        date: todayKey,
-        operations: { ...operations },
-        initialState: { ...initialState },
-        gold: lastState.gold >= 0 ? lastState.gold : null,
-        exp: lastState.exp >= 0 ? lastState.exp : null,
-        savedAt: Date.now(),
-    };
+    const data = buildStatsSnapshot();
     savePersistedStats(currentAccountId, data);
     // 同步归档到每日历史，供趋势曲线使用
     archiveDailySnapshot(currentAccountId, data);

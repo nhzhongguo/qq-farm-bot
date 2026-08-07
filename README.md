@@ -6,12 +6,12 @@
 
 > 多账号 QQ 农场自动化托管平台 —— 挂机 · 看板 · 告警 · 运维，一套自托管方案全搞定。
 
-[![version](https://img.shields.io/badge/version-v2.5.0-blue)](https://github.com/nhzhongguo/qq-farm-bot/releases)
+[![version](https://img.shields.io/badge/version-v2.7.0-blue)](https://github.com/nhzhongguo/qq-farm-bot/releases)
 [![Node](https://img.shields.io/badge/Node.js-20%2B-339933)](https://nodejs.org)
 [![Vue](https://img.shields.io/badge/Frontend-Vue3-42b883)](https://vuejs.org)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ed)](https://www.docker.com)
-[![Tests](https://img.shields.io/badge/unit-tests%20130%20passed-brightgreen)]()
-[![E2E](https://img.shields.io/badge/e2e-11%20passed-brightgreen)]()
+[![Tests](https://img.shields.io/badge/unit-tests%20154%20passed-brightgreen)]()
+[![E2E](https://img.shields.io/badge/e2e-16%20passed-brightgreen)]()
 
 ---
 
@@ -191,10 +191,10 @@ Copy-Item .\core\data ".ackup-$stamp" -Recurse
 ## 开发与质量保障
 
 ```bash
-pnpm test              # 单元测试（130 项全部通过）
+pnpm test              # 单元测试（154 项全部通过）
 pnpm lint:check        # 只读代码规范检查
 pnpm build             # 前端类型检查与生产构建
-pnpm test:e2e          # Playwright 端到端测试（11 项）
+pnpm test:e2e          # Playwright 端到端测试（16 项）
 pnpm audit --prod      # 生产依赖安全审计
 ```
 

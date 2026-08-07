@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
-import api from '@/api'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
-import { useToastStore } from '@/stores/toast'
+import { cachedGet } from '@/utils/request'
 
 interface TrendPoint {
   date: string
@@ -18,13 +17,13 @@ interface TrendPoint {
 }
 
 const accountStore = useAccountStore()
-const toast = useToastStore()
 const { currentAccountId, currentAccount } = storeToRefs(accountStore)
 
 const loading = ref(false)
 const loadError = ref('')
 const range = ref(30)
 const points = ref<TrendPoint[]>([])
+const showRaw = ref(false)
 
 const rangeOptions = [
   { value: 7, label: '近 7 天' },
@@ -43,18 +42,8 @@ async function loadTrend() {
     return
   loading.value = true
   try {
-    const { data } = await api.get('/api/stats/trend', {
-      params: { days: range.value },
-      headers: { 'x-account-id': currentAccountId.value },
-    })
-    if (data?.ok && data.data) {
-      points.value = Array.isArray(data.data.points) ? data.data.points : []
-    }
-    else {
-      points.value = []
-      if (data?.error)
-        toast.error(String(data.error))
-    }
+    const trend = await cachedGet<{ points: TrendPoint[] }>('/api/stats/trend', { days: range.value }, { ttl: 30000 })
+    points.value = Array.isArray(trend.points) ? trend.points : []
   }
   catch (error: any) {
     points.value = []
@@ -115,18 +104,18 @@ function formatAxis(value: number) {
 
     <div v-else>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+        <div class="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
           <div class="i-carbon-data-set text-lg text-[var(--theme-primary)]" />
-          <span class="text-gray-800 font-medium dark:text-gray-200">{{ currentAccount?.name }}</span>
+          <span class="text-[var(--color-text-primary)] font-medium">{{ currentAccount?.name }}</span>
         </div>
-        <div class="flex overflow-hidden border border-gray-200 rounded-lg dark:border-gray-600">
+        <div class="flex overflow-hidden border border-[var(--color-border-default)] rounded-lg">
           <button
             v-for="option in rangeOptions"
             :key="option.value"
             class="px-4 py-1.5 text-sm font-medium transition-colors"
             :class="range === option.value
               ? 'text-white'
-              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'"
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-subtle)]'"
             :style="range === option.value ? { backgroundColor: 'var(--theme-primary)' } : {}"
             @click="range = option.value"
           >
@@ -156,52 +145,52 @@ function formatAxis(value: number) {
       <div v-else class="space-y-4">
         <!-- 汇总卡片 -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div class="border border-amber-200 rounded-lg bg-white p-4 dark:border-amber-900 dark:bg-gray-800">
-            <div class="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+          <div class="ds-card p-4" style="border-color: color-mix(in srgb, var(--color-chart-gold) 38%, var(--color-border-default))">
+            <div class="flex items-center gap-2 text-sm text-[var(--color-chart-gold)]">
               <div class="i-carbon-currency" />
               当前金币
             </div>
-            <div class="mt-1 text-2xl text-gray-900 font-bold dark:text-white">
+            <div class="mt-1 text-2xl text-[var(--color-text-primary)] font-bold">
               {{ formatAxis(points[points.length - 1]?.gold || 0) }}
             </div>
-            <div class="mt-1 text-xs text-gray-400">
+            <div class="mt-1 text-xs text-[var(--color-text-tertiary)]">
               周期内累计 +{{ formatAxis(points.reduce((s, p) => s + (p.goldGained || 0), 0)) }}
             </div>
           </div>
-          <div class="border border-purple-200 rounded-lg bg-white p-4 dark:border-purple-900 dark:bg-gray-800">
-            <div class="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400">
+          <div class="ds-card p-4" style="border-color: color-mix(in srgb, var(--color-chart-purple) 38%, var(--color-border-default))">
+            <div class="flex items-center gap-2 text-sm text-[var(--color-chart-purple)]">
               <div class="i-carbon-growth" />
               当前经验
             </div>
-            <div class="mt-1 text-2xl text-gray-900 font-bold dark:text-white">
+            <div class="mt-1 text-2xl text-[var(--color-text-primary)] font-bold">
               {{ formatAxis(points[points.length - 1]?.exp || 0) }}
             </div>
-            <div class="mt-1 text-xs text-gray-400">
+            <div class="mt-1 text-xs text-[var(--color-text-tertiary)]">
               周期内累计 +{{ formatAxis(points.reduce((s, p) => s + (p.expGained || 0), 0)) }}
             </div>
           </div>
-          <div class="border border-green-200 rounded-lg bg-white p-4 dark:border-green-900 dark:bg-gray-800">
-            <div class="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+          <div class="ds-card p-4" style="border-color: color-mix(in srgb, var(--color-chart-green) 38%, var(--color-border-default))">
+            <div class="flex items-center gap-2 text-sm text-[var(--color-chart-green)]">
               <div class="i-carbon-catalog" />
               周期操作数
             </div>
-            <div class="mt-1 text-2xl text-gray-900 font-bold dark:text-white">
+            <div class="mt-1 text-2xl text-[var(--color-text-primary)] font-bold">
               {{ formatAxis(totalOperations.reduce((s, n) => s + n, 0)) }}
             </div>
-            <div class="mt-1 text-xs text-gray-400">
+            <div class="mt-1 text-xs text-[var(--color-text-tertiary)]">
               日均 {{ formatAxis(Math.round(totalOperations.reduce((s, n) => s + n, 0) / Math.max(points.length, 1))) }}
             </div>
           </div>
         </div>
 
         <!-- 金币趋势 -->
-        <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div class="ds-card p-4">
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm text-gray-800 font-semibold dark:text-gray-200">
-              <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-amber-500 align-middle" />
+            <h3 class="text-sm text-[var(--color-text-primary)] font-semibold">
+              <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[var(--color-chart-gold)] align-middle" />
               金币趋势
             </h3>
-            <span class="text-xs text-gray-400">累计余额与每日增量</span>
+            <span class="text-xs text-[var(--color-text-tertiary)]">累计余额与每日增量</span>
           </div>
           <div class="flex flex-wrap items-start gap-1">
             <svg viewBox="0 0 560 160" class="chart-svg max-w-full min-w-0 w-full flex-1" preserveAspectRatio="none">
@@ -224,20 +213,20 @@ function formatAxis(value: number) {
               </g>
             </svg>
           </div>
-          <div class="mt-1 flex justify-between text-[10px] text-gray-400">
+          <div class="mt-1 flex justify-between text-[10px] text-[var(--color-text-tertiary)]">
             <span>{{ points[0]?.date || '' }}</span>
             <span>{{ points[points.length - 1]?.date || '' }}</span>
           </div>
         </div>
 
         <!-- 经验趋势 -->
-        <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div class="ds-card p-4">
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm text-gray-800 font-semibold dark:text-gray-200">
-              <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-purple-500 align-middle" />
+            <h3 class="text-sm text-[var(--color-text-primary)] font-semibold">
+              <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[var(--color-chart-purple)] align-middle" />
               经验趋势
             </h3>
-            <span class="text-xs text-gray-400">累计经验与每日增量</span>
+            <span class="text-xs text-[var(--color-text-tertiary)]">累计经验与每日增量</span>
           </div>
           <svg viewBox="0 0 560 160" class="chart-svg w-full" preserveAspectRatio="none">
             <defs>
@@ -258,20 +247,20 @@ function formatAxis(value: number) {
               />
             </g>
           </svg>
-          <div class="mt-1 flex justify-between text-[10px] text-gray-400">
+          <div class="mt-1 flex justify-between text-[10px] text-[var(--color-text-tertiary)]">
             <span>{{ points[0]?.date || '' }}</span>
             <span>{{ points[points.length - 1]?.date || '' }}</span>
           </div>
         </div>
 
         <!-- 每日操作数 -->
-        <div class="border border-gray-200 rounded-lg bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div class="ds-card p-4">
           <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-sm text-gray-800 font-semibold dark:text-gray-200">
-              <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-green-500 align-middle" />
+            <h3 class="text-sm text-[var(--color-text-primary)] font-semibold">
+              <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-[var(--color-chart-green)] align-middle" />
               每日操作数
             </h3>
-            <span class="text-xs text-gray-400">收获/种植/偷菜/任务等操作合计</span>
+            <span class="text-xs text-[var(--color-text-tertiary)]">收获/种植/偷菜/任务等操作合计</span>
           </div>
           <svg viewBox="0 0 560 160" class="chart-svg w-full" preserveAspectRatio="none">
             <g v-if="totalOperations.length">
@@ -287,9 +276,62 @@ function formatAxis(value: number) {
               />
             </g>
           </svg>
-          <div class="mt-1 flex justify-between text-[10px] text-gray-400">
+          <div class="mt-1 flex justify-between text-[10px] text-[var(--color-text-tertiary)]">
             <span>{{ points[0]?.date || '' }}</span>
             <span>{{ points[points.length - 1]?.date || '' }}</span>
+          </div>
+        </div>
+
+        <!-- 数值明细：窄屏 / 无渲染时的文本兜底 -->
+        <div class="ds-card p-4">
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <h3 class="text-sm text-[var(--color-text-primary)] font-semibold">
+              数值明细
+            </h3>
+            <button
+              type="button"
+              class="ds-chip"
+              :aria-expanded="showRaw"
+              @click="showRaw = !showRaw"
+            >
+              {{ showRaw ? '收起明细' : '查看数值明细' }}
+            </button>
+          </div>
+          <div v-if="showRaw" class="overflow-x-auto">
+            <table class="w-full text-xs text-[var(--color-text-secondary)] tabular-nums">
+              <thead class="text-[var(--color-text-tertiary)]">
+                <tr>
+                  <th class="py-1 pr-3 text-left font-medium">
+                    日期
+                  </th>
+                  <th class="py-1 pr-3 text-right font-medium">
+                    金币（当日增量）
+                  </th>
+                  <th class="py-1 pr-3 text-right font-medium">
+                    经验（当日增量）
+                  </th>
+                  <th class="py-1 text-right font-medium">
+                    操作数
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(p, i) in points" :key="p.date || i" class="border-t border-[var(--color-border-default)]">
+                  <td class="py-1.5 pr-3">
+                    {{ p.date }}
+                  </td>
+                  <td class="py-1.5 pr-3 text-right">
+                    {{ formatAxis(p.gold) }}<span class="text-[var(--color-text-tertiary)]">（+{{ formatAxis(p.goldGained || 0) }}）</span>
+                  </td>
+                  <td class="py-1.5 pr-3 text-right">
+                    {{ formatAxis(p.exp) }}<span class="text-[var(--color-text-tertiary)]">（+{{ formatAxis(p.expGained || 0) }}）</span>
+                  </td>
+                  <td class="py-1.5 text-right">
+                    {{ formatAxis(Object.values(p.operations || {}).reduce((s, n) => s + (Number(n) || 0), 0)) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

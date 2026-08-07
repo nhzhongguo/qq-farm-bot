@@ -8,6 +8,7 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseSwitch from '@/components/ui/BaseSwitch.vue'
 import PageHeader from '@/components/ui/PageHeader.vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 import { useToastStore } from '@/stores/toast'
 import { useUserStore } from '@/stores/user'
 
@@ -1083,6 +1084,10 @@ interface AlertTrigger {
 }
 
 const showAlertRuleModal = ref(false)
+const { setContainer: createModalSetContainer } = useFocusTrap(showCreateModal)
+const { setContainer: editModalSetContainer } = useFocusTrap(showEditModal)
+const { setContainer: clearLogsConfirmSetContainer } = useFocusTrap(showClearLogsConfirm)
+const { setContainer: alertRuleModalSetContainer } = useFocusTrap(showAlertRuleModal)
 const newAlertRule = ref({
   name: '',
   description: '',
@@ -1607,11 +1612,15 @@ function renderMarkdown(text: string) {
 
           <div
             v-if="showCreateModal"
+            :ref="createModalSetContainer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-card-title"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
             @click.self="showCreateModal = false"
           >
             <div class="max-w-md w-full rounded-lg bg-white p-5 dark:bg-gray-800" @click.stop>
-              <h2 class="mb-4 text-lg text-gray-900 font-bold dark:text-white">
+              <h2 id="create-card-title" class="mb-4 text-lg text-gray-900 font-bold dark:text-white">
                 创建卡密
               </h2>
               <div class="space-y-3">
@@ -1912,11 +1921,15 @@ function renderMarkdown(text: string) {
 
           <div
             v-if="showEditModal"
+            :ref="editModalSetContainer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-user-title"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
             @click.self="showEditModal = false"
           >
             <div class="max-w-md w-full rounded-lg bg-white p-5 dark:bg-gray-800" @click.stop>
-              <h2 class="mb-4 text-lg text-gray-900 font-bold dark:text-white">
+              <h2 id="edit-user-title" class="mb-4 text-lg text-gray-900 font-bold dark:text-white">
                 编辑用户：{{ selectedUser?.username }}
               </h2>
               <div class="space-y-3">
@@ -2093,11 +2106,15 @@ function renderMarkdown(text: string) {
           <!-- 清空日志确认弹窗 -->
           <div
             v-if="showClearLogsConfirm"
+            :ref="clearLogsConfirmSetContainer"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-logs-title"
             class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
             @click.self="showClearLogsConfirm = false"
           >
             <div class="max-w-md w-full rounded-lg bg-white p-5 dark:bg-gray-800" @click.stop>
-              <h2 class="mb-4 text-lg text-gray-900 font-bold dark:text-white">
+              <h2 id="clear-logs-title" class="mb-4 text-lg text-gray-900 font-bold dark:text-white">
                 确认清空日志
               </h2>
               <p class="mb-4 text-gray-600 dark:text-gray-300">
@@ -2693,9 +2710,9 @@ function renderMarkdown(text: string) {
     />
 
     <!-- 新建告警规则弹窗 -->
-    <div v-if="showAlertRuleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showAlertRuleModal = false">
+    <div v-if="showAlertRuleModal" :ref="alertRuleModalSetContainer" role="dialog" aria-modal="true" aria-labelledby="alert-rule-title" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="showAlertRuleModal = false">
       <div class="ds-surface max-w-md w-full p-6">
-        <h3 class="mb-4 text-lg font-bold">
+        <h3 id="alert-rule-title" class="mb-4 text-lg font-bold">
           新建告警规则
         </h3>
         <div class="space-y-3">

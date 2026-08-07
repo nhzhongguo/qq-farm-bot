@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const { getDataFile } = require('../config/runtime-paths');
 const { readJsonFile, writeJsonFileAtomic } = require('./json-db');
 
@@ -12,6 +13,22 @@ const EXPORTABLE_FIELDS = [
     'fertilizerBuyNormalCount', 'fertilizerBuyNormalThresholdHours',
     'fertilizerBuyCheckIntervalMinutes', 'bagSeedPriority', 'bagSeedFallbackStrategy',
 ];
+
+function normalizeOwner(owner) {
+    return owner ? String(owner) : null;
+}
+
+function isTemplateVisible(template, owner) {
+    const normalizedOwner = normalizeOwner(owner);
+    if (normalizedOwner === null) return true;
+    return !template.owner || String(template.owner) === normalizedOwner;
+}
+
+function canModifyTemplate(template, owner) {
+    const normalizedOwner = normalizeOwner(owner);
+    if (normalizedOwner === null) return true;
+    return String(template.owner || '') === normalizedOwner;
+}
 
 function createStrategyTemplate(options = {}) {
     const filePath = options.filePath || getDataFile('strategy_templates.json');
@@ -101,17 +118,19 @@ function createStrategyTemplate(options = {}) {
      * @param {string} [description] - 模板描述
      * @param {object} configData - 配置数据
      */
-    function saveTemplate(name, description, configData) {
+    function saveTemplate(name, description, configData, owner = null) {
         const trimmedName = String(name || '').trim();
         if (!trimmedName) throw new Error('模板名称不能为空');
         if (trimmedName.length > 50) throw new Error('模板名称不能超过 50 个字符');
 
         const templates = readTemplates();
-        const existing = templates.findIndex(t => t.name === trimmedName);
+        const ownerKey = String(normalizeOwner(owner) || '');
+        const existing = templates.findIndex(t => t.name === trimmedName && String(t.owner || '') === ownerKey);
         const exported = exportConfig(configData);
         const template = {
-            id: existing >= 0 ? templates[existing].id : `tpl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            id: existing >= 0 ? templates[existing].id : `tpl_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`,
             name: trimmedName,
+            owner: normalizeOwner(owner),
             description: String(description || '').trim().slice(0, 200),
             createdAt: existing >= 0 ? templates[existing].createdAt : Date.now(),
             updatedAt: Date.now(),
@@ -128,24 +147,29 @@ function createStrategyTemplate(options = {}) {
         return template;
     }
 
-    function listTemplates() {
-        return readTemplates().map(t => ({
-            id: t.id,
-            name: t.name,
-            description: t.description,
-            createdAt: t.createdAt,
-            updatedAt: t.updatedAt,
-        }));
+    function listTemplates(owner = null) {
+        return readTemplates()
+            .filter(t => isTemplateVisible(t, owner))
+            .map(t => ({
+                id: t.id,
+                name: t.name,
+                owner: t.owner || null,
+                description: t.description,
+                createdAt: t.createdAt,
+                updatedAt: t.updatedAt,
+            }));
     }
 
-    function getTemplate(id) {
-        return readTemplates().find(t => t.id === id) || null;
+    function getTemplate(id, owner = null) {
+        const template = readTemplates().find(t => t.id === id) || null;
+        return template && isTemplateVisible(template, owner) ? template : null;
     }
 
-    function deleteTemplate(id) {
+    function deleteTemplate(id, owner = null) {
         const templates = readTemplates();
         const idx = templates.findIndex(t => t.id === id);
         if (idx < 0) return false;
+        if (!canModifyTemplate(templates[idx], owner)) return false;
         templates.splice(idx, 1);
         persist(templates);
         return true;

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import api from '@/api'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 
 const props = defineProps<{
   show: boolean
@@ -10,6 +11,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits(['close', 'saved'])
+
+const { setContainer } = useFocusTrap(toRef(props, 'show'))
 
 const name = ref('')
 const loading = ref(false)
@@ -53,19 +56,32 @@ async function save() {
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div class="max-w-sm w-full overflow-hidden rounded-lg bg-white shadow-xl dark:bg-gray-800">
-      <div class="flex items-center justify-between border-b border-gray-200 p-4 dark:border-gray-700">
-        <h3 class="text-lg font-semibold">
+  <div
+    v-if="show"
+    :ref="setContainer"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="remark-modal-title"
+    class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-[var(--color-bg-overlay)] p-4 backdrop-blur-sm"
+    @click.self="emit('close')"
+    @keydown.esc="emit('close')"
+  >
+    <div class="ds-surface-solid max-w-sm w-full overflow-hidden shadow-[var(--shadow-lg)]">
+      <div class="flex items-center justify-between border-b border-[var(--color-border-default)] p-4">
+        <h3 id="remark-modal-title" class="text-lg text-[var(--color-text-primary)] font-semibold">
           修改备注
         </h3>
-        <BaseButton variant="ghost" class="!p-1" @click="$emit('close')">
-          <div class="i-carbon-close text-xl" />
+        <BaseButton variant="ghost" class="!p-1" aria-label="关闭" @click="emit('close')">
+          <div class="i-carbon-close text-xl text-[var(--color-text-secondary)]" />
         </BaseButton>
       </div>
 
       <div class="p-4 space-y-4">
-        <div v-if="errorMessage" class="rounded bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+        <div
+          v-if="errorMessage"
+          class="rounded bg-[var(--color-danger-soft)] p-3 text-sm text-[var(--color-danger)]"
+          role="alert"
+        >
           {{ errorMessage }}
         </div>
         <BaseInput
@@ -78,7 +94,7 @@ async function save() {
         <div class="flex justify-end gap-2">
           <BaseButton
             variant="outline"
-            @click="$emit('close')"
+            @click="emit('close')"
           >
             取消
           </BaseButton>

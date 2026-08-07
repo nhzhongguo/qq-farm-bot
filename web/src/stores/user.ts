@@ -2,6 +2,7 @@ import { useStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed } from 'vue'
 import api from '@/api'
+import { clearCachedGet } from '@/utils/request'
 import { useJsonStorage } from '@/utils/storage'
 
 export interface UserCard {
@@ -121,6 +122,7 @@ export const useUserStore = defineStore('user', () => {
     finally {
       token.value = ''
       userInfo.value = null
+      clearCachedGet()
     }
   }
 

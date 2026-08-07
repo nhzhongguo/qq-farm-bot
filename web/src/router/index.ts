@@ -2,6 +2,7 @@ import { useStorage } from '@vueuse/core'
 import axios from 'axios'
 import NProgress from 'nprogress'
 import { createRouter, createWebHistory } from 'vue-router'
+import { cancelAllRequests } from '@/utils/request'
 import { useJsonStorage } from '@/utils/storage'
 import { menuRoutes } from './menu'
 import 'nprogress/nprogress.css'
@@ -101,6 +102,8 @@ router.beforeEach(async (to, _from) => {
 
 router.afterEach(() => {
   NProgress.done()
+  // 路由切换时取消上一页仍在途的请求，避免过期响应写回已卸载页面
+  cancelAllRequests()
 })
 
 export default router

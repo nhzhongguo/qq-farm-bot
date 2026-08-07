@@ -30,6 +30,9 @@ const strategyTemplate = require('../services/strategy-template');
 const alertRuleEngine = require('../services/alert-rule-engine');
 const auditLog = require('../services/audit-log');
 const reportService = require('../services/report');
+const strategyCompare = require('../services/strategy-compare');
+const sessionStore = require('../services/session-store');
+const metrics = require('../services/metrics');
 
 const adminLogger = createModuleLogger('admin');
 
@@ -138,12 +141,16 @@ function emitRealtimeAccountLog(entry) {
 function startAdminServer(dataProvider) {
     if (app) return;
     provider = dataProvider;
+    sessionStore.load();
 
     app = express();
     app.disable('x-powered-by');
     const trustProxyEnv = String(process.env.TRUST_PROXY || '').trim().toLowerCase();
     app.set('trust proxy', trustProxyEnv === '1' || trustProxyEnv === 'true' ? 1 : false);
     app.use(express.json({ limit: '1mb' }));
+
+    // 轻量运行指标：API 耗时/错误与持久化耗时采样（p50/p95，仅内存，不落盘）
+    app.use(metrics.createTimingMiddleware());
 
     // Baseline HTTP security headers (helmet-lite, no extra dependency)
     app.use((req, res, next) => {
@@ -158,6 +165,19 @@ function startAdminServer(dataProvider) {
         }
         next();
     });
+
+    const ACCOUNT_PAYLOAD_FIELDS = ['id', 'name', 'code', 'platform', 'uin', 'qq', 'avatar', 'avatarUrl', 'loginType', 'remark'];
+
+    function pickAccountPayload(body, canSetOwner) {
+        const picked = {};
+        for (const key of ACCOUNT_PAYLOAD_FIELDS) {
+            if (body && body[key] !== undefined) picked[key] = body[key];
+        }
+        if (canSetOwner && body && body.username !== undefined) {
+            picked.username = String(body.username);
+        }
+        return picked;
+    }
 
     function getClientIp(req) {
         if (req.ip) {
@@ -175,40 +195,72 @@ function startAdminServer(dataProvider) {
         return 'unknown';
     }
 
-    const tokens = new Set();
-    const tokenSessions = new Map();
     const sessionAbsoluteTtlMs = Math.max(1_000, Number(process.env.SESSION_ABSOLUTE_TTL_MS) || 12 * 60 * 60 * 1000);
     const sessionIdleTtlMs = Math.max(1_000, Number(process.env.SESSION_IDLE_TTL_MS) || 2 * 60 * 60 * 1000);
 
     const issueToken = () => crypto.randomBytes(24).toString('hex');
-    const invalidateToken = (token) => {
-        tokens.delete(token);
-        tokenUserMap.delete(token);
-        tokenSessions.delete(token);
-        if (io) {
-            for (const socket of io.sockets.sockets.values()) {
-                if (String(socket.data.adminToken || '') === String(token)) {
-                    socket.disconnect(true);
-                }
+
+    const disconnectSocketsBySessionHash = (tokenHash) => {
+        if (!io || !tokenHash) return;
+        for (const socket of io.sockets.sockets.values()) {
+            if (String(socket.data.sessionHash || '') === String(tokenHash)) {
+                socket.disconnect(true);
             }
         }
     };
-    const getValidSessionUser = (token, touch = true) => {
-        if (!token || !tokens.has(token)) return null;
-        const session = tokenSessions.get(token);
-        const now = Date.now();
-        if (!session || now >= session.expiresAt || now - session.lastSeenAt >= sessionIdleTtlMs) {
-            invalidateToken(token);
+
+    const invalidateSessionByHash = (tokenHash) => {
+        if (!tokenHash) return;
+        if (sessionStore.removeByHash(tokenHash)) {
+            disconnectSocketsBySessionHash(tokenHash);
+        }
+    };
+
+    const invalidateToken = (token) => {
+        if (!token) return;
+        const removed = sessionStore.remove(token);
+        if (removed) {
+            disconnectSocketsBySessionHash(removed.tokenHash);
+        }
+    };
+
+    const getValidSessionUserByHash = (tokenHash, touch = false) => {
+        if (!tokenHash) return null;
+        const session = touch
+            ? sessionStore.touchByHash(tokenHash, { idleTtlMs: sessionIdleTtlMs })
+            : sessionStore.getByHash(tokenHash, { idleTtlMs: sessionIdleTtlMs });
+        if (!session) {
+            disconnectSocketsBySessionHash(tokenHash);
             return null;
         }
-        const user = tokenUserMap.get(token);
+        const user = userStore.getUserSnapshot(session.username);
         if (!user) {
-            invalidateToken(token);
+            invalidateSessionByHash(session.tokenHash);
             return null;
         }
-        if (touch) session.lastSeenAt = now;
         return user;
     };
+
+    const getValidSessionUser = (token, touch = true) => {
+        if (!token) return null;
+        const session = touch
+            ? sessionStore.touch(token, { idleTtlMs: sessionIdleTtlMs })
+            : sessionStore.get(token, { idleTtlMs: sessionIdleTtlMs });
+        if (!session) {
+            disconnectSocketsBySessionHash(sessionStore.hashToken(token));
+            return null;
+        }
+        return getValidSessionUserByHash(session.tokenHash, false);
+    };
+
+    const isActiveUser = (user) => {
+        if (!user) return false;
+        if (user.role === 'admin') return true;
+        if (user.card && user.card.enabled === false) return false;
+        if (user.card && user.card.expiresAt && user.card.expiresAt < Date.now()) return false;
+        return true;
+    };
+
     const authRequired = (req, res, next) => {
         const token = req.headers['x-admin-token'];
         const currentUser = getValidSessionUser(token);
@@ -250,13 +302,11 @@ function startAdminServer(dataProvider) {
         
         if (origin && allowedOrigins.includes(origin)) {
             res.header('Access-Control-Allow-Origin', origin);
-        } else if (!origin) {
-            res.header('Access-Control-Allow-Origin', '*');
+            res.header('Access-Control-Allow-Credentials', 'true');
         }
         
         res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS, PUT');
         res.header('Access-Control-Allow-Headers', 'Content-Type, x-account-id, x-admin-token');
-        res.header('Access-Control-Allow-Credentials', 'true');
         res.header('Access-Control-Max-Age', '86400');
         
         if (req.method === 'OPTIONS') return res.sendStatus(200);
@@ -265,15 +315,26 @@ function startAdminServer(dataProvider) {
 
     const webDist = path.join(__dirname, '../../../web/dist');
     if (fs.existsSync(webDist)) {
-        app.use(express.static(webDist));
+        app.use(express.static(webDist, {
+            setHeaders(res, filePath) {
+                const relative = path.relative(webDist, filePath).replace(/\\/g, '/');
+                if (relative === 'index.html') {
+                    // 入口 HTML 每次重新校验，避免发布后客户端拿到旧引用
+                    res.setHeader('Cache-Control', 'no-cache');
+                } else if (relative.startsWith('assets/') || /-[\w-]{8,}\.\w+$/.test(path.basename(relative))) {
+                    // Vite 带 hash 的静态资源：内容不变即可长期缓存
+                    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+                } else {
+                    // 根目录非 hash 资源（icon/logo 等）：短缓存 + 允许重新校验
+                    res.setHeader('Cache-Control', 'public, max-age=86400');
+                }
+            },
+        }));
     } else {
         adminLogger.warn('web build not found', { webDist });
         app.get('/', (req, res) => res.send('web build not found. Please build the web project.'));
     }
     app.use('/game-config', express.static(getResourcePath('gameConfig')));
-
-    // Token 到用户映射（用于用户系统）
-    const tokenUserMap = new Map();
 
     // 检查用户是否有权访问（管理员或普通用户）
     const checkUserAccess = (req, res, next) => {
@@ -314,33 +375,26 @@ function startAdminServer(dataProvider) {
     // 定期清理过期用户（每5分钟检查一次）
     const cleanupExpiredUsers = () => {
         const now = Date.now();
-        const usersToCleanup = [];
-
-        for (const [token, user] of tokenUserMap.entries()) {
-            if (!getValidSessionUser(token, false)) {
-                usersToCleanup.push({ token, username: user.username, reason: 'session_expired' });
+        for (const session of sessionStore.list()) {
+            const currentUser = getValidSessionUserByHash(session.tokenHash, false);
+            if (!currentUser) {
+                console.log(`[自动清理] 用户 ${session.username} 的会话已失效，已强制下线`);
                 continue;
             }
-            if (user.role === 'admin') continue; // 管理员不检查卡密状态
+            if (currentUser.role === 'admin') continue; // 管理员不检查卡密状态
 
             // 检查是否被封禁
-            if (user.card && user.card.enabled === false) {
-                console.log(`[自动检查] 用户 ${user.username} 已被封禁，执行清理...`);
-                usersToCleanup.push({ token, username: user.username, reason: 'banned' });
+            if (currentUser.card && currentUser.card.enabled === false) {
+                console.log(`[自动检查] 用户 ${currentUser.username} 已被封禁，执行清理...`);
+                invalidateSessionByHash(session.tokenHash);
                 continue;
             }
 
             // 检查是否过期
-            if (user.card && user.card.expiresAt && user.card.expiresAt < now) {
-                console.log(`[自动检查] 用户 ${user.username} 已过期，执行清理...`);
-                usersToCleanup.push({ token, username: user.username, reason: 'expired' });
+            if (currentUser.card && currentUser.card.expiresAt && currentUser.card.expiresAt < now) {
+                console.log(`[自动检查] 用户 ${currentUser.username} 已过期，执行清理...`);
+                invalidateSessionByHash(session.tokenHash);
             }
-        }
-
-        for (const { token, username, reason } of usersToCleanup) {
-            invalidateToken(token);
-            const label = reason === 'banned' ? '被封禁' : reason === 'expired' ? '过期' : '会话过期';
-            console.log(`[自动清理] 用户 ${username} 已${label}，已强制下线`);
         }
     };
 
@@ -364,8 +418,9 @@ function startAdminServer(dataProvider) {
         maxRequests: 10,
     });
 
-    // 测试阶段：关闭密码校验，仅按用户名登录。
-    const disablePasswordLogin = process.env.FARM_TEST === '1';
+    // 仅限本地测试显式开启；生产环境即使设置 FARM_TEST=1 也不能绕过密码。
+    const disablePasswordLogin = process.env.FARM_TEST === '1'
+        && (process.env.NODE_ENV === 'test' || process.env.ALLOW_INSECURE_TEST_LOGIN === '1');
 
     // 登录与鉴权
     app.post('/api/login', loginRateLimit, (req, res) => {
@@ -437,14 +492,8 @@ function startAdminServer(dataProvider) {
             }
 
             const token = issueToken();
-            tokens.add(token);
-            tokenUserMap.set(token, user);
             const createdAt = Date.now();
-            tokenSessions.set(token, {
-                createdAt,
-                lastSeenAt: createdAt,
-                expiresAt: createdAt + sessionAbsoluteTtlMs,
-            });
+            sessionStore.create(token, user.username, { absoluteTtlMs: sessionAbsoluteTtlMs });
             
             adminLogger.info('登录成功', { username, role: user.role, ip: clientIp });
 
@@ -562,16 +611,6 @@ function startAdminServer(dataProvider) {
             return res.status(400).json(result);
         }
 
-        // 更新 token 中的用户信息
-        for (const [token, user] of tokenUserMap.entries()) {
-            if (user.username === username) {
-                user.card = result.card;
-                user.accountLimit = result.accountLimit;
-                tokenUserMap.set(token, user);
-                break;
-            }
-        }
-
         res.json({ ok: true, data: { card: result.card, accountLimit: result.accountLimit, cardType: result.cardType } });
     });
 
@@ -589,14 +628,6 @@ function startAdminServer(dataProvider) {
         }
 
         const result = userStore.changePassword(username, oldPassword, newPassword);
-        if (result.ok) {
-            for (const [token, user] of tokenUserMap.entries()) {
-                if (user.username === username) {
-                    user.mustChangePassword = false;
-                    tokenUserMap.set(token, user);
-                }
-            }
-        }
         res.json(result);
     });
 
@@ -935,6 +966,9 @@ function startAdminServer(dataProvider) {
     app.get('/api/interact-records', async (req, res) => {
         const id = getAccId(req);
         if (!id) return res.status(400).json({ ok: false, error: 'Missing x-account-id' });
+        if (!checkAccountAccess(req, id)) {
+            return res.status(403).json({ ok: false, error: '无权访问此账号' });
+        }
         try {
             const data = await provider.getInteractRecords(id);
             res.json({ ok: true, data });
@@ -1729,7 +1763,47 @@ function startAdminServer(dataProvider) {
         }
     });
 
+    // API: 策略对比（Analytics 页新增：当前策略 vs 理论最优收益差距）
+    app.get('/api/analytics/strategy-compare', async (req, res) => {
+        const id = getAccId(req);
+        if (!id) {
+            return res.status(400).json({ ok: false, error: 'Missing x-account-id' });
+        }
+        if (!checkAccountAccess(req, id)) {
+            return res.status(403).json({ ok: false, error: '无权访问此账号' });
+        }
+        try {
+            const days = Math.min(Math.max(Number.parseInt(req.query.days, 10) || 7, 1), 90);
+            const result = strategyCompare.compareStrategyPerformance(id, days);
+            let currentLevel = null;
+            try {
+                const statusData = provider && typeof provider.getStatus === 'function' ? provider.getStatus(id) : null;
+                const rawLevel = statusData && statusData.status ? Number(statusData.status.level) : Number.NaN;
+                if (Number.isFinite(rawLevel)) currentLevel = rawLevel;
+            } catch {
+                // 状态不可用时按全等级推荐，前端仍会按实际等级展示
+            }
+            result.recommendations = strategyCompare.getStrategyRecommendations(
+                id,
+                result.current && result.current.strategy ? result.current.strategy : 'max_exp',
+                5,
+                currentLevel,
+            );
+            res.json({ ok: true, data: result });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
     // API: 收益趋势（金币/经验/操作数 7/30/90 天）
+
+    // API: 运行指标（仅管理员）：API 耗时/错误与 JSON 持久化 p50/p95
+    app.get('/api/metrics', authRequired, (req, res) => {
+        if (!req.currentUser || req.currentUser.role !== 'admin') {
+            return res.status(403).json({ ok: false, error: '需要管理员权限' });
+        }
+        res.json({ ok: true, data: metrics.summarize() });
+    });
     app.get('/api/stats/trend', async (req, res) => {
         const id = getAccId(req);
         if (!id) {
@@ -2235,7 +2309,8 @@ function startAdminServer(dataProvider) {
 
     app.get('/api/strategy-templates', authRequired, (req, res) => {
         try {
-            res.json({ ok: true, data: { templates: strategyTemplate.listTemplates() } });
+            const templateOwner = req.currentUser && req.currentUser.role === 'admin' ? null : req.currentUser.username;
+            res.json({ ok: true, data: { templates: strategyTemplate.listTemplates(templateOwner) } });
         } catch (error) {
             handleApiError(res, error);
         }
@@ -2243,7 +2318,8 @@ function startAdminServer(dataProvider) {
 
     app.get('/api/strategy-templates/:id', authRequired, (req, res) => {
         try {
-            const template = strategyTemplate.getTemplate(req.params.id);
+            const templateOwner = req.currentUser && req.currentUser.role === 'admin' ? null : req.currentUser.username;
+            const template = strategyTemplate.getTemplate(req.params.id, templateOwner);
             if (!template) return res.status(404).json({ ok: false, error: '模板不存在' });
             res.json({ ok: true, data: template });
         } catch (error) {
@@ -2255,7 +2331,8 @@ function startAdminServer(dataProvider) {
         try {
             const { name, description, configData } = req.body || {};
             if (!configData) return res.status(400).json({ ok: false, error: '请提供配置数据' });
-            const template = strategyTemplate.saveTemplate(name, description, configData);
+            const templateOwner = req.currentUser && req.currentUser.role === 'admin' ? null : req.currentUser.username;
+            const template = strategyTemplate.saveTemplate(name, description, configData, templateOwner);
             auditLog.record({
                 actor: req.currentUser.username, action: 'template.save', target: `template:${template.name}`,
                 ip: getClientIp(req),
@@ -2268,9 +2345,11 @@ function startAdminServer(dataProvider) {
 
     app.delete('/api/strategy-templates/:id', authRequired, (req, res) => {
         try {
-            const template = strategyTemplate.getTemplate(req.params.id);
-            const ok = strategyTemplate.deleteTemplate(req.params.id);
-            if (!ok) return res.status(404).json({ ok: false, error: '模板不存在' });
+            const templateOwner = req.currentUser && req.currentUser.role === 'admin' ? null : req.currentUser.username;
+            const template = strategyTemplate.getTemplate(req.params.id, templateOwner);
+            if (!template) return res.status(404).json({ ok: false, error: '模板不存在' });
+            const ok = strategyTemplate.deleteTemplate(req.params.id, templateOwner);
+            if (!ok) return res.status(403).json({ ok: false, error: '无权操作此模板' });
             auditLog.record({
                 actor: req.currentUser.username, action: 'template.delete', target: `template:${template?.name || req.params.id}`,
                 ip: getClientIp(req), severity: 'warning',
@@ -2654,7 +2733,7 @@ function startAdminServer(dataProvider) {
             // 清理过期记录
             userStore.clearExpiredClaimRecords();
             
-            const result = userStore.claimCardByUA(identity, username);
+            const result = userStore.claimCardByUA(identity, username, getClientIp(req));
             
             if (!result.ok) {
                 const response = { ok: false, error: result.error };
@@ -2731,18 +2810,11 @@ function startAdminServer(dataProvider) {
                 return res.status(400).json(result);
             }
 
-            if (result.user.username !== username && store.renameUserOwnership) {
-                store.renameUserOwnership(username, result.user.username);
-            }
-
-            // 更新该用户所有会话中的信息
-            for (const [token, user] of tokenUserMap.entries()) {
-                if (user.username === username || user.username === newUsername) {
-                    user.username = result.user.username;
-                    user.card = result.user.card;
-                    user.accountLimit = result.user.accountLimit;
-                    tokenUserMap.set(token, user);
+            if (result.user.username !== username) {
+                if (store.renameUserOwnership) {
+                    store.renameUserOwnership(username, result.user.username);
                 }
+                sessionStore.renameUser(username, result.user.username);
             }
 
             res.json({ ok: true, data: result.user });
@@ -2775,10 +2847,8 @@ function startAdminServer(dataProvider) {
             if (store.deleteAccountsByUser) store.deleteAccountsByUser(username);
             if (store.deleteUserConfig) store.deleteUserConfig(username);
             // 强制下线该用户的所有会话
-            for (const [token, user] of tokenUserMap.entries()) {
-                if (user.username === username) {
-                    invalidateToken(token);
-                }
+            for (const session of sessionStore.removeByUsername(username)) {
+                disconnectSocketsBySessionHash(session.tokenHash);
             }
             auditLog.record({
                 actor: currentUser.username, action: 'user.delete', target: `username:${username}`,
@@ -2803,15 +2873,6 @@ function startAdminServer(dataProvider) {
             const result = userStore.renewUser(username, cardCode);
             if (!result.ok) {
                 return res.status(400).json(result);
-            }
-
-            // 更新该用户所有会话中的卡密信息
-            for (const [token, user] of tokenUserMap.entries()) {
-                if (user.username === username) {
-                    user.card = result.card;
-                    user.accountLimit = result.accountLimit;
-                    tokenUserMap.set(token, user);
-                }
             }
 
             res.json({ ok: true, data: { card: result.card, accountLimit: result.accountLimit, cardType: result.cardType } });
@@ -2949,6 +3010,8 @@ function startAdminServer(dataProvider) {
             const body = (req.body && typeof req.body === 'object') ? req.body : {};
             const currentUser = req.currentUser;
             const isUpdate = !!body.id;
+            const canSetOwner = !currentUser || currentUser.role === 'admin';
+            const sanitizedPayload = pickAccountPayload(body, canSetOwner);
 
             // 检查权限：普通用户只能更新自己的账号
             if (isUpdate && currentUser && currentUser.role !== 'admin') {
@@ -2972,7 +3035,7 @@ function startAdminServer(dataProvider) {
             }
 
             const resolvedUpdateId = isUpdate ? resolveAccId(body.id) : '';
-            const payload = isUpdate ? { ...body, id: resolvedUpdateId || String(body.id) } : body;
+            const payload = isUpdate ? { ...sanitizedPayload, id: resolvedUpdateId || String(body.id) } : sanitizedPayload;
             let wasRunning = false;
             if (isUpdate && provider.isAccountRunning) {
                 wasRunning = provider.isAccountRunning(payload.id);
@@ -2980,9 +3043,11 @@ function startAdminServer(dataProvider) {
 
             // 检查是否仅修改了备注信息
             let onlyRemarkChanged = false;
-            if (isUpdate) {
+            if (isUpdate && provider && typeof provider.getAccounts === 'function') {
                 const oldAccounts = provider.getAccounts();
-                const oldAccount = oldAccounts.accounts.find(a => a.id === payload.id);
+                const oldAccount = oldAccounts && Array.isArray(oldAccounts.accounts)
+                    ? oldAccounts.accounts.find(a => a.id === payload.id)
+                    : null;
                 if (oldAccount) {
                     // 检查 payload 中是否只包含 id 和 name 字段
                     const payloadKeys = Object.keys(payload);
@@ -3054,7 +3119,7 @@ function startAdminServer(dataProvider) {
             let list = provider.getAccountLogs ? provider.getAccountLogs(limit) : [];
             if (!Array.isArray(list)) list = [];
 
-            // 所有用户（包括管理员）只能看到自己账号的操作日志
+            // 普通用户只能看到自己的账号日志；管理员可以查看全部账号
             if (currentUser) {
                 const accessibleIds = getAccessibleAccountIds(req);
                 list = list.filter(log => {
@@ -3191,14 +3256,26 @@ function startAdminServer(dataProvider) {
                 const nickname = result.nickname || ''; // 获取昵称
                 const appid = '1112386029'; // Farm appid
 
-                const authCode = await MiniProgramLoginSession.getAuthCode(ticket, appid);
+                const authResult = await MiniProgramLoginSession.getAuthCodeResult(ticket, appid);
 
                 let avatar = '';
                 if (uin) {
                     avatar = `https://q1.qlogo.cn/g?b=qq&nk=${uin}&s=640`;
                 }
 
-                res.json({ ok: true, data: { status: 'OK', code: authCode, uin, avatar, nickname } });
+                if (!authResult.code) {
+                    const blocked = authResult.errorCode === '-3000';
+                    return res.status(502).json({
+                        ok: false,
+                        code: blocked ? 'QQ_QR_LOGIN_BLOCKED' : 'QQ_QR_LOGIN_CODE_UNAVAILABLE',
+                        error: blocked
+                            ? 'QQ 官方已拒绝当前扫码登录方式（-3000：校验失败）。请切换到“手动填码”，使用手机抓包获取农场登录 Code。'
+                            : `扫码已确认，但未能换取有效的农场登录 Code${authResult.message ? `：${authResult.message}` : ''}`,
+                        upstreamCode: authResult.errorCode || undefined,
+                    });
+                }
+
+                res.json({ ok: true, data: { status: 'OK', code: authResult.code, uin, avatar, nickname } });
             } else if (result.status === 'Used') {
                 res.json({ ok: true, data: { status: 'Used' } });
             } else if (result.status === 'Wait') {
@@ -3311,7 +3388,17 @@ function startAdminServer(dataProvider) {
 
         // 获取当前用户信息
         const token = socket.data.adminToken;
-        const currentUser = token ? tokenUserMap.get(token) : null;
+        const currentUser = token ? getValidSessionUser(token, false) : null;
+        if (!currentUser) {
+            socket.disconnect(true);
+            return;
+        }
+        if (!isActiveUser(currentUser)) {
+            invalidateToken(token);
+            socket.disconnect(true);
+            return;
+        }
+        socket.data.user = currentUser;
 
         // 检查权限：如果指定了账号ID，检查用户是否有权访问
         if (resolved && currentUser) {
@@ -3427,11 +3514,17 @@ function startAdminServer(dataProvider) {
             ? String(socket.handshake.headers['x-admin-token'])
             : '';
         const token = authToken || headerToken;
-        const currentUser = getValidSessionUser(token);
-        if (!currentUser) {
+        const session = sessionStore.touch(token, { idleTtlMs: sessionIdleTtlMs });
+        if (!session) {
+            return next(new Error('Unauthorized'));
+        }
+        const currentUser = getValidSessionUserByHash(session.tokenHash, false);
+        if (!currentUser || !isActiveUser(currentUser)) {
+            invalidateSessionByHash(session.tokenHash);
             return next(new Error('Unauthorized'));
         }
         socket.data.adminToken = token;
+        socket.data.sessionHash = session.tokenHash;
         // 存储用户信息到socket
         socket.data.user = currentUser;
         return next();
@@ -3465,6 +3558,7 @@ function stopAdminServer() {
         try { server.close(); } catch { /* ignore */ }
         server = null;
     }
+    try { sessionStore.flush(); } catch { /* ignore */ }
     app = null;
     provider = null;
 }
